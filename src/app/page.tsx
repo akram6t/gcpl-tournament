@@ -22,6 +22,7 @@ import { PlayersSection } from "@/components/cricket/players-section";
 import { GallerySection } from "@/components/cricket/gallery-section";
 import { RolesSection } from "@/components/cricket/roles-section";
 import { Footer } from "@/components/cricket/footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { liveMatchData } from "@/lib/cricket-data";
 
 const tabs = [
@@ -34,7 +35,7 @@ const tabs = [
   { value: "roles", label: "Roles", icon: UserCog },
 ] as const;
 
-export default function Home() {
+export default function HomePage() {
   const [activeTab, setActiveTab] = useState("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -46,7 +47,7 @@ export default function Home() {
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo */}
             <div className="flex items-center gap-2.5 shrink-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-green-500 to-lime-500 flex items-center justify-center text-white font-extrabold text-sm sm:text-base shadow-lg shadow-green-500/20">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-green-500 to-lime-500 flex items-center justify-center text-white font-extrabold text-sm sm:text-base shadow-lg shadow-green-500/25">
                 G
               </div>
               <div className="hidden sm:block">
@@ -59,11 +60,11 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Live Indicator (Desktop) */}
+            {/* Center: Live Indicator (Desktop) */}
             <div className="hidden md:flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
-                <span className="text-xs font-semibold text-red-400">LIVE</span>
+                <span className="text-xs font-semibold text-red-500">LIVE</span>
                 <span className="text-xs text-muted-foreground">
                   AA vs WW • M{liveMatchData.matchNumber}
                 </span>
@@ -71,14 +72,14 @@ export default function Home() {
             </div>
 
             {/* Desktop Nav Tabs */}
-            <nav className="hidden lg:block">
+            <nav className="hidden lg:flex items-center gap-3">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="bg-transparent h-auto gap-1 p-0">
                   {tabs.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
                       value={tab.value}
-                      className="rounded-lg px-3 py-2 text-xs font-medium data-[state=active]:bg-green-500/15 data-[state=active]:text-green-400 data-[state=active]:shadow-none transition-all hover:bg-card/50"
+                      className="rounded-lg px-3 py-2 text-xs font-medium data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none transition-all hover:bg-accent/50"
                     >
                       <tab.icon className="w-3.5 h-3.5 mr-1.5" />
                       {tab.label}
@@ -86,20 +87,24 @@ export default function Home() {
                   ))}
                 </TabsList>
               </Tabs>
+              <ThemeToggle />
             </nav>
 
-            {/* Mobile Menu Button */}
-            <button
-              className="lg:hidden p-2 rounded-lg hover:bg-card transition-colors"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
-            </button>
+            {/* Right: Mobile controls */}
+            <div className="flex lg:hidden items-center gap-2">
+              <ThemeToggle />
+              <button
+                className="p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5" />
+                ) : (
+                  <Menu className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -117,7 +122,7 @@ export default function Home() {
               <div className="flex items-center gap-2 px-4 py-2">
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20">
                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
-                  <span className="text-xs font-semibold text-red-400">LIVE</span>
+                  <span className="text-xs font-semibold text-red-500">LIVE</span>
                   <span className="text-xs text-muted-foreground">
                     AA vs WW
                   </span>
@@ -132,13 +137,13 @@ export default function Home() {
                         setActiveTab(tab.value);
                         setMobileMenuOpen(false);
                       }}
-                      className={`flex flex-col items-center gap-1 p-2.5 rounded-xl text-xs font-medium transition-all ${
+                      className={`flex flex-col items-center gap-1 p-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                         activeTab === tab.value
-                          ? "bg-green-500/15 text-green-400"
-                          : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                       }`}
                     >
-                      <tab.icon className="w-4.5 h-4.5" />
+                      <tab.icon className="w-4 h-4" />
                       <span className="text-xs">{tab.label}</span>
                     </button>
                   ))}
