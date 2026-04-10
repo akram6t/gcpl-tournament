@@ -52,3 +52,14 @@ prompt
 server.log
 # Skills directory
 /skills/
+# database
+db/*.db
+*.db-journal
+
+# env files (keep templates, ignore secrets)
+.env
+.env.local
+.env.*.local
+
+# prisma generated (regenerated on install)
+node_modules/.prisma/
