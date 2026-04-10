@@ -6,6 +6,7 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
+import { Toaster } from "@/components/ui/sonner";
 
 const pageMeta: Record<string, { title: string; description: string }> = {
   "/admin": { title: "Dashboard", description: "Overview of tournament statistics and activity" },
@@ -90,6 +91,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <AdminTopbar pageTitle={meta.title} pageDescription={meta.description} />
         <main className="flex-1 p-6">{children}</main>
       </div>
+      <Toaster />
     </div>
   );
 }

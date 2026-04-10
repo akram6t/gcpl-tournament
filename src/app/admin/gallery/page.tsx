@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { galleryImages } from "@/lib/cricket-data";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { toast } from "sonner";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { StatsCard } from "@/components/admin/stats-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Select,
@@ -53,11 +53,22 @@ import {
   FolderOpen,
   Calendar,
   X,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
-import { GalleryImage } from "@/lib/cricket-data";
 
-const categories = [
-  "All",
+// ─── Types ────────────────────────────────────────────────────────────
+interface GalleryItem {
+  id: string;
+  title: string;
+  category: string;
+  imageUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Predefined category list for dropdowns ──────────────────────────
+const predefinedCategories = [
   "Events",
   "Highlights",
   "Teams",
@@ -70,49 +81,228 @@ const categories = [
 
 type ViewMode = "grid" | "list";
 
+// ─── Skeleton components ─────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <Card className="border-border/50 overflow-hidden">
+      <div className="aspect-video bg-muted animate-pulse" />
+      <CardContent className="p-3 space-y-2">
+        <div className="h-4 bg-muted rounded w-3/4 animate-pulse" />
+        <div className="h-5 bg-muted rounded w-1/3 animate-pulse" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableCell>
+        <div className="w-14 h-10 rounded-md bg-muted animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="h-4 bg-muted rounded w-40 animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="h-5 bg-muted rounded w-20 animate-pulse" />
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">
+        <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center justify-end gap-1">
+          <div className="h-8 w-8 rounded-md bg-muted animate-pulse" />
+          <div className="h-8 w-8 rounded-md bg-muted animate-pulse" />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────
 export default function GalleryPage() {
+  // Data state
+  const [images, setImages] = useState<GalleryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMutating, setIsMutating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // UI state
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingImage, setDeletingImage] = useState<GalleryImage | null>(null);
+  const [deletingImage, setDeletingImage] = useState<GalleryItem | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
+  const [editingImage, setEditingImage] = useState<GalleryItem | null>(null);
   const [uploadForm, setUploadForm] = useState({
     title: "",
     category: "",
+    imageUrl: "",
   });
   const [editForm, setEditForm] = useState({
     title: "",
     category: "",
+    imageUrl: "",
   });
 
-  const uniqueCategories = useMemo(() => {
-    const cats = new Set(galleryImages.map((img) => img.category));
-    return categories.filter((c) => c === "All" || cats.has(c));
+  // ─── Fetch gallery data ──────────────────────────────────────────
+  const fetchGallery = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await apiGet<GalleryItem[]>("/api/gallery");
+      setImages(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load gallery";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const filteredImages = useMemo(() => {
-    if (selectedCategory === "All") return galleryImages;
-    return galleryImages.filter((img) => img.category === selectedCategory);
-  }, [selectedCategory]);
+  useEffect(() => {
+    fetchGallery();
+  }, [fetchGallery]);
 
+  // ─── Derived data ────────────────────────────────────────────────
+  const allCategories = useMemo(() => {
+    const dataCategories = new Set(images.map((img) => img.category));
+    // Show "All" plus predefined categories that have data, plus any dynamic categories
+    const dynamicCategories = Array.from(dataCategories).filter(
+      (c) => !predefinedCategories.includes(c)
+    );
+    const sorted = [...predefinedCategories, ...dynamicCategories].filter(
+      (c) => c === "All" || dataCategories.has(c)
+    );
+    return ["All", ...sorted];
+  }, [images]);
+
+  const filteredImages = useMemo(() => {
+    if (selectedCategory === "All") return images;
+    return images.filter((img) => img.category === selectedCategory);
+  }, [images, selectedCategory]);
+
+  const latestUploadDate = useMemo(() => {
+    if (images.length === 0) return "N/A";
+    const sorted = [...images].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return new Date(sorted[0].createdAt).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [images]);
+
+  const activeCategoryCount = useMemo(() => {
+    return new Set(images.map((img) => img.category)).size;
+  }, [images]);
+
+  // ─── Mutation handlers ───────────────────────────────────────────
+  const handleUpload = async () => {
+    if (!uploadForm.title.trim() || !uploadForm.category) {
+      toast.error("Please fill in title and select a category");
+      return;
+    }
+    try {
+      setIsMutating(true);
+      await apiPost<GalleryItem>("/api/gallery", {
+        title: uploadForm.title.trim(),
+        category: uploadForm.category,
+        imageUrl: uploadForm.imageUrl.trim() || null,
+      });
+      toast.success("Photo added to gallery successfully");
+      setUploadDialogOpen(false);
+      setUploadForm({ title: "", category: "", imageUrl: "" });
+      await fetchGallery();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to upload photo";
+      toast.error(message);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editingImage || !editForm.title.trim() || !editForm.category) {
+      toast.error("Please fill in title and select a category");
+      return;
+    }
+    try {
+      setIsMutating(true);
+      await apiPut<GalleryItem>("/api/gallery", {
+        id: editingImage.id,
+        title: editForm.title.trim(),
+        category: editForm.category,
+        imageUrl: editForm.imageUrl.trim() || null,
+      });
+      toast.success("Photo updated successfully");
+      setEditDialogOpen(false);
+      setEditingImage(null);
+      await fetchGallery();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update photo";
+      toast.error(message);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingImage) return;
+    try {
+      setIsMutating(true);
+      await apiDelete("/api/gallery", deletingImage.id);
+      toast.success(`"${deletingImage.title}" deleted from gallery`);
+      setDeleteDialogOpen(false);
+      setDeletingImage(null);
+      await fetchGallery();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete photo";
+      toast.error(message);
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  // ─── Dialog openers ──────────────────────────────────────────────
   const openUploadDialog = () => {
-    setUploadForm({ title: "", category: "" });
+    setUploadForm({ title: "", category: "", imageUrl: "" });
     setUploadDialogOpen(true);
   };
 
-  const openEditDialog = (image: GalleryImage) => {
+  const openEditDialog = (image: GalleryItem) => {
     setEditingImage(image);
-    setEditForm({ title: image.title, category: image.category });
+    setEditForm({
+      title: image.title,
+      category: image.category,
+      imageUrl: image.imageUrl || "",
+    });
     setEditDialogOpen(true);
   };
 
-  const openDeleteDialog = (image: GalleryImage) => {
+  const openDeleteDialog = (image: GalleryItem) => {
     setDeletingImage(image);
     setDeleteDialogOpen(true);
   };
 
+  // ─── Helper: category count ──────────────────────────────────────
+  const getCategoryCount = (category: string) => {
+    return images.filter((img) => img.category === category).length;
+  };
+
+  // ─── Helper: format date ─────────────────────────────────────────
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header Actions */}
@@ -121,17 +311,29 @@ export default function GalleryPage() {
           <h2 className="text-lg font-semibold text-foreground">Gallery Management</h2>
           <p className="text-sm text-muted-foreground">Manage tournament photos and media</p>
         </div>
-        <Button className="gap-2" onClick={openUploadDialog}>
-          <Upload className="w-4 h-4" />
-          Upload Photos
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={fetchGallery}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button className="gap-2" onClick={openUploadDialog}>
+            <Upload className="w-4 h-4" />
+            Upload Photos
+          </Button>
+        </div>
       </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatsCard
           title="Total Photos"
-          value={galleryImages.length}
+          value={images.length}
           icon={Camera}
           description="In gallery"
           iconColor="text-green-600 dark:text-green-400"
@@ -139,7 +341,7 @@ export default function GalleryPage() {
         />
         <StatsCard
           title="Categories"
-          value={uniqueCategories.length - 1}
+          value={activeCategoryCount}
           icon={FolderOpen}
           description="Active categories"
           iconColor="text-purple-600 dark:text-purple-400"
@@ -147,7 +349,7 @@ export default function GalleryPage() {
         />
         <StatsCard
           title="Latest Upload"
-          value="28 Jan 2025"
+          value={latestUploadDate}
           icon={Calendar}
           description="Most recent photo"
           iconColor="text-amber-600 dark:text-amber-400"
@@ -161,28 +363,43 @@ export default function GalleryPage() {
           <div className="flex flex-col gap-4">
             {/* Category Badges */}
             <div className="flex flex-wrap gap-2">
-              {uniqueCategories.map((category) => (
-                <Button
-                  key={category}
-                  variant={selectedCategory === category ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => setSelectedCategory(category)}
-                >
-                  {category}
-                  {category !== "All" && (
-                    <Badge variant="secondary" className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px]">
-                      {galleryImages.filter((img) => img.category === category).length}
-                    </Badge>
-                  )}
-                </Button>
-              ))}
+              {isLoading ? (
+                // Loading skeletons for category badges
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-8 w-20 rounded-md bg-muted animate-pulse"
+                  />
+                ))
+              ) : (
+                allCategories.map((category) => (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setSelectedCategory(category)}
+                  >
+                    {category}
+                    {category !== "All" && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-1.5 h-5 min-w-5 px-1.5 text-[10px]"
+                      >
+                        {getCategoryCount(category)}
+                      </Badge>
+                    )}
+                  </Button>
+                ))
+              )}
             </div>
 
             {/* View Toggle & Count */}
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {filteredImages.length} photo{filteredImages.length !== 1 ? "s" : ""} found
+                {isLoading
+                  ? "Loading..."
+                  : `${filteredImages.length} photo${filteredImages.length !== 1 ? "s" : ""} found`}
               </p>
               <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                 <Button
@@ -207,8 +424,61 @@ export default function GalleryPage() {
         </CardContent>
       </Card>
 
+      {/* Error State */}
+      {error && !isLoading && (
+        <Card className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/5">
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/15 flex items-center justify-center">
+                <X className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Failed to Load Gallery</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">{error}</p>
+              <Button variant="outline" onClick={fetchGallery} className="gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading Skeletons */}
+      {isLoading && (
+        <>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : (
+            <Card className="border-border/50">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-20">Preview</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead className="w-40">Category</TableHead>
+                      <TableHead className="w-32 hidden sm:table-cell">Date</TableHead>
+                      <TableHead className="w-24 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <SkeletonRow key={i} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
       {/* Empty State */}
-      {filteredImages.length === 0 && (
+      {!isLoading && !error && filteredImages.length === 0 && (
         <Card className="border-border/50">
           <CardContent className="py-16">
             <div className="flex flex-col items-center gap-3 text-center">
@@ -217,28 +487,50 @@ export default function GalleryPage() {
               </div>
               <h3 className="text-lg font-semibold text-foreground">No Photos Found</h3>
               <p className="text-sm text-muted-foreground max-w-sm">
-                No photos found in the &ldquo;{selectedCategory}&rdquo; category. Try selecting a different category or upload new photos.
+                {selectedCategory !== "All"
+                  ? `No photos found in the "${selectedCategory}" category. Try selecting a different category or upload new photos.`
+                  : "No photos in the gallery yet. Click the button below to upload your first photo."}
               </p>
-              <Button variant="outline" onClick={() => setSelectedCategory("All")}>
-                <X className="w-4 h-4 mr-2" />
-                Clear Filter
-              </Button>
+              {selectedCategory !== "All" ? (
+                <Button variant="outline" onClick={() => setSelectedCategory("All")}>
+                  <X className="w-4 h-4 mr-2" />
+                  Clear Filter
+                </Button>
+              ) : (
+                <Button onClick={openUploadDialog} className="gap-2">
+                  <Upload className="w-4 h-4" />
+                  Upload First Photo
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Grid View */}
-      {filteredImages.length > 0 && viewMode === "grid" && (
+      {!isLoading && filteredImages.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredImages.map((image, idx) => (
+          {filteredImages.map((image) => (
             <Card
               key={image.id}
               className="border-border/50 overflow-hidden group hover:shadow-lg transition-all duration-300 hover:scale-[1.02]"
             >
-              {/* Image Placeholder */}
-              <div className="relative aspect-video bg-gradient-to-br from-green-500/10 via-muted to-lime-500/10 flex items-center justify-center">
-                <ImageIcon className="w-10 h-10 text-muted-foreground/40" />
+              {/* Image / Placeholder */}
+              <div className="relative aspect-video bg-gradient-to-br from-green-500/10 via-muted to-lime-500/10 flex items-center justify-center overflow-hidden">
+                {image.imageUrl ? (
+                  <img
+                    src={image.imageUrl}
+                    alt={image.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                      (
+                        e.target as HTMLImageElement
+                      ).parentElement!.querySelector(".fallback-icon")!.classList.remove("hidden");
+                    }}
+                  />
+                ) : null}
+                <ImageIcon className="w-10 h-10 text-muted-foreground/40 fallback-icon" />
                 {/* Hover Actions Overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
                   <Button
@@ -288,7 +580,7 @@ export default function GalleryPage() {
       )}
 
       {/* List View */}
-      {filteredImages.length > 0 && viewMode === "list" && (
+      {!isLoading && filteredImages.length > 0 && viewMode === "list" && (
         <Card className="border-border/50">
           <CardContent className="p-0">
             <Table>
@@ -305,7 +597,17 @@ export default function GalleryPage() {
                 {filteredImages.map((image) => (
                   <TableRow key={image.id} className="hover:bg-muted/50 transition-colors">
                     <TableCell>
-                      <div className="w-14 h-10 rounded-md bg-gradient-to-br from-green-500/10 via-muted to-lime-500/10 flex items-center justify-center">
+                      <div className="w-14 h-10 rounded-md bg-gradient-to-br from-green-500/10 via-muted to-lime-500/10 flex items-center justify-center overflow-hidden">
+                        {image.imageUrl ? (
+                          <img
+                            src={image.imageUrl}
+                            alt={image.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        ) : null}
                         <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
                       </div>
                     </TableCell>
@@ -318,7 +620,9 @@ export default function GalleryPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <span className="text-sm text-muted-foreground">28 Jan 2025</span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDate(image.createdAt)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
@@ -364,20 +668,24 @@ export default function GalleryPage() {
                 id="upload-title"
                 placeholder="Enter photo title..."
                 value={uploadForm.title}
-                onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                onChange={(e) =>
+                  setUploadForm({ ...uploadForm, title: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="upload-category">Category</Label>
               <Select
                 value={uploadForm.category}
-                onValueChange={(val) => setUploadForm({ ...uploadForm, category: val })}
+                onValueChange={(val) =>
+                  setUploadForm({ ...uploadForm, category: val })
+                }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.filter((c) => c !== "All").map((cat) => (
+                  {predefinedCategories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>
@@ -385,16 +693,30 @@ export default function GalleryPage() {
                 </SelectContent>
               </Select>
             </div>
-            {/* File Upload Area */}
             <div className="grid gap-2">
-              <Label>Photo</Label>
+              <Label htmlFor="upload-image-url">Image URL (optional)</Label>
+              <Input
+                id="upload-image-url"
+                placeholder="https://example.com/photo.jpg"
+                value={uploadForm.imageUrl}
+                onChange={(e) =>
+                  setUploadForm({ ...uploadForm, imageUrl: e.target.value })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste a direct link to the image file
+              </p>
+            </div>
+            {/* Upload area visual */}
+            <div className="grid gap-2">
+              <Label>Preview</Label>
               <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer">
                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                   <Upload className="w-6 h-6 text-muted-foreground" />
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-medium text-foreground">
-                    Click to upload or drag and drop
+                    Or provide an image URL above
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     PNG, JPG, GIF up to 10MB
@@ -404,10 +726,15 @@ export default function GalleryPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(false)}
+              disabled={isMutating}
+            >
               Cancel
             </Button>
-            <Button onClick={() => setUploadDialogOpen(false)}>
+            <Button onClick={handleUpload} disabled={isMutating} className="gap-2">
+              {isMutating && <Loader2 className="w-4 h-4 animate-spin" />}
               Upload Photo
             </Button>
           </DialogFooter>
@@ -419,9 +746,7 @@ export default function GalleryPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Photo</DialogTitle>
-            <DialogDescription>
-              Update photo details.
-            </DialogDescription>
+            <DialogDescription>Update photo details.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -429,20 +754,24 @@ export default function GalleryPage() {
               <Input
                 id="edit-title"
                 value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, title: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-category">Category</Label>
               <Select
                 value={editForm.category}
-                onValueChange={(val) => setEditForm({ ...editForm, category: val })}
+                onValueChange={(val) =>
+                  setEditForm({ ...editForm, category: val })
+                }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.filter((c) => c !== "All").map((cat) => (
+                  {predefinedCategories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>
@@ -450,12 +779,28 @@ export default function GalleryPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-image-url">Image URL (optional)</Label>
+              <Input
+                id="edit-image-url"
+                placeholder="https://example.com/photo.jpg"
+                value={editForm.imageUrl}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, imageUrl: e.target.value })
+                }
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={isMutating}
+            >
               Cancel
             </Button>
-            <Button onClick={() => setEditDialogOpen(false)}>
+            <Button onClick={handleEdit} disabled={isMutating} className="gap-2">
+              {isMutating && <Loader2 className="w-4 h-4 animate-spin" />}
               Save Changes
             </Button>
           </DialogFooter>
@@ -474,8 +819,13 @@ export default function GalleryPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700">
+            <AlertDialogCancel disabled={isMutating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 gap-2"
+              onClick={handleDelete}
+              disabled={isMutating}
+            >
+              {isMutating && <Loader2 className="w-4 h-4 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

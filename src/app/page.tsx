@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -25,7 +25,7 @@ import { RolesSection } from "@/components/cricket/roles-section";
 import { Footer } from "@/components/cricket/footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
-import { liveMatchData } from "@/lib/cricket-data";
+import { fetchFixtures, type Fixture } from "@/lib/cricket-data";
 
 const tabs = [
   { value: "home", label: "Home", icon: HomeIcon },
@@ -40,6 +40,20 @@ const tabs = [
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [liveMatch, setLiveMatch] = useState<Fixture | null>(null);
+  const [fixturesLoaded, setFixturesLoaded] = useState(false);
+
+  useEffect(() => {
+    fetchFixtures()
+      .then((data) => {
+        const live = data.find((f) => f.status === "live") ?? null;
+        setLiveMatch(live);
+        setFixturesLoaded(true);
+      })
+      .catch(() => {
+        setFixturesLoaded(true);
+      });
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -63,15 +77,17 @@ export default function HomePage() {
             </div>
 
             {/* Center: Live Indicator (Desktop) */}
-            <div className="hidden md:flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
-                <span className="text-xs font-semibold text-red-500">LIVE</span>
-                <span className="text-xs text-muted-foreground">
-                  AA vs WW • M{liveMatchData.matchNumber}
-                </span>
+            {fixturesLoaded && liveMatch && (
+              <div className="hidden md:flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
+                  <span className="text-xs font-semibold text-red-500">LIVE</span>
+                  <span className="text-xs text-muted-foreground">
+                    {liveMatch.team1Short} vs {liveMatch.team2Short} • M{liveMatch.matchNumber}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Desktop Nav Tabs */}
             <nav className="hidden lg:flex items-center gap-3">
@@ -125,15 +141,17 @@ export default function HomePage() {
               className="lg:hidden border-t border-border/30 overflow-hidden"
             >
               {/* Live Indicator (Mobile) */}
-              <div className="flex items-center gap-2 px-4 py-2">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
-                  <span className="text-xs font-semibold text-red-500">LIVE</span>
-                  <span className="text-xs text-muted-foreground">
-                    AA vs WW
-                  </span>
+              {fixturesLoaded && liveMatch && (
+                <div className="flex items-center gap-2 px-4 py-2">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
+                    <span className="text-xs font-semibold text-red-500">LIVE</span>
+                    <span className="text-xs text-muted-foreground">
+                      {liveMatch.team1Short} vs {liveMatch.team2Short}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
               <nav className="px-4 pb-3">
                 <div className="grid grid-cols-5 gap-2">
                   {tabs.map((tab) => (

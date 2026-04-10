@@ -120,3 +120,285 @@ Login Credentials:
 - Organizer: organizer@gcpl.com / org123
 - Player: rahul@gcpl.com / user123
 - Fan: fan@gcpl.com / user123
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Rewrite admin Gallery management page to use real API calls
+
+Work Log:
+- Added Sonner Toaster component to root layout (`src/app/layout.tsx`) alongside existing shadcn Toaster
+- Completely rewrote `/src/app/admin/gallery/page.tsx` replacing mock data with real API integration
+- Replaced `galleryImages` import from `@/lib/cricket-data` with `apiGet`, `apiPost`, `apiPut`, `apiDelete` from `@/lib/api.ts`
+- Implemented `fetchGallery()` with `useCallback` for data fetching on mount and after mutations
+- Added loading states (`isLoading`, `isMutating`) with skeleton components for both grid and list views
+- Added error state with retry button for failed API calls
+- Implemented `handleUpload()` — POST to `/api/gallery` with { title, category, imageUrl }
+- Implemented `handleEdit()` — PUT to `/api/gallery` with { id, title, category, imageUrl }
+- Implemented `handleDelete()` — DELETE to `/api/gallery?id={id}`
+- Added sonner toast notifications for all CRUD operations (success and error)
+- Categories dynamically derived from gallery data using `useMemo`
+- Kept predefined categories list for dropdowns: ["Events", "Highlights", "Teams", "Venues", "Celebrations", "Fans", "Match Moments", "Behind the Scenes"]
+- Added "Refresh" button in header to manually re-fetch gallery data
+- Added image URL field to upload and edit dialogs
+- Stats cards now show live data (total photos count, active category count, latest upload date)
+- Preserved ALL existing UI: grid/list toggle, category filter badges with counts, stats row, upload dialog, edit dialog, delete confirmation dialog, empty state, hover actions overlay
+- ESLint passes with zero errors
+
+Stage Summary:
+- Gallery page fully connected to PostgreSQL backend via REST API
+- Full CRUD operations with loading spinners, error handling, and toast notifications
+- Responsive design maintained with skeleton loading for grid and list views
+
+---
+Task ID: 2 (API Migration)
+Agent: Main Agent
+Task: Rewrite admin Teams management page to use real API calls instead of mock data
+
+Work Log:
+- Read existing admin/teams/page.tsx, api.ts helpers, cricket-data types, and /api/teams route
+- Removed static imports of `teams` and `Team` from `@/lib/cricket-data`
+- Defined local `Team` interface matching API response (includes `_count`, `createdAt`, `updatedAt`)
+- Replaced static data with `apiGet("/api/teams")` fetch on mount via `useEffect` + `useCallback`
+- Implemented real Add Team via `apiPost("/api/teams", formData)` with validation
+- Implemented real Edit Team via `apiPut("/api/teams", { id, ...fields })`
+- Implemented real Delete Team via `apiDelete("/api/teams", id)`
+- Added loading spinner (`Loader2` + `animate-spin`) during initial fetch and delete operations
+- Added loading state with spinner inside table area during fetch
+- Added empty state when no teams match filters or no teams exist
+- Added `submitting` state for the dialog submit button with spinner text
+- Added toast notifications (`sonner`) on all CRUD operations: success for create/update/delete, error on failure
+- Added `deletingId` state to show per-row spinner on the delete button
+- Added "Logo / Emoji" field to the Add/Edit dialog form
+- Added `logo` field to `formData` state (default "🏏")
+- Auto-refreshes team list after every mutation via `fetchTeams()` callback
+- Page bounds correction: resets `currentPage` if it exceeds `totalPages` after data change
+- Preserved ALL existing UI: stats cards, search, status filter, bulk actions bar, desktop table, mobile cards, pagination, add/edit dialog
+- ESLint passes with zero errors
+
+Stage Summary:
+- Admin Teams page now fully powered by PostgreSQL API (GET/POST/PUT/DELETE)
+- Loading states with spinners during data fetch and mutations
+- Toast notifications on every CRUD success/error
+- Empty state when no data matches filters
+- Per-row delete spinner to prevent double-clicks
+- All responsive UI preserved (mobile cards + desktop table + pagination)
+
+---
+Task ID: 4 (Fixtures API Migration)
+Agent: Main Agent
+Task: Rewrite admin Fixtures management page to use real API calls instead of mock data
+
+Work Log:
+- Read existing admin/fixtures/page.tsx, api.ts helpers, cricket-data types, /api/fixtures and /api/teams routes
+- Removed static imports of `fixtures`, `teams`, and `Fixture` from `@/lib/cricket-data`
+- Defined local `FixtureItem` and `ApiTeam` interfaces matching API response shapes
+- Replaced static data with parallel API fetches on mount: `apiGet("/api/fixtures")` + `apiGet("/api/teams")`
+- Normalized API response: converted UPPERCASE status values ("COMPLETED"/"LIVE"/"UPCOMING") to lowercase for UI display
+- Implemented real Add Fixture via `apiPost("/api/fixtures", payload)` with validation (both teams required, different teams, date + venue required)
+- Implemented real Edit Fixture via `apiPut("/api/fixtures", { id, ...fields })` — form stores team1Id/team2Id, resolved by matching team name from teams list
+- Implemented real Update Score via `apiPut("/api/fixtures", { id, score, result })` — merges current fixture data with new score/result
+- Implemented real Delete Fixture via `apiDelete("/api/fixtures", id)` with `?id=` query param
+- Added loading skeleton UI during initial data fetch (animated pulse placeholders for stats, filter bar, and table rows)
+- Added `isSubmitting` state with `Loader2` spinner on submit/delete buttons during async operations
+- Added toast notifications (`sonner`) on all CRUD operations: success messages for create/update/delete/score, error messages on failure
+- Added empty state when no fixtures match search/filter (with "Schedule Match" button when no filters active)
+- Team selectors in Add/Edit dialog now show teams from API with their emoji logos (e.g., "🔥 Dadar Dynamos")
+- Preserved ALL existing UI: stats cards, status filter tabs, search input, desktop table, mobile cards, pagination, add/edit dialog, score dialog, live pulse animation, colored status badges
+- ESLint passes with zero errors
+
+Stage Summary:
+- Admin Fixtures page now fully powered by PostgreSQL API (GET/POST/PUT/DELETE)
+- Loading skeletons during initial data fetch
+- Toast notifications on every CRUD operation
+- Team selectors populated from /api/teams with logos
+- Status normalization between API (UPPERCASE) and UI (lowercase)
+- Form validation before submission
+- All responsive UI preserved (mobile cards + desktop table + pagination)
+
+---
+Task ID: 3 (API Migration)
+Agent: Main Agent
+Task: Rewrite admin Players management page to use real API calls instead of mock data
+
+Work Log:
+- Read existing admin/players/page.tsx, api.ts helpers, cricket-data types, /api/players route, /api/teams route
+- Removed static imports of `topPlayers`, `tournamentInfo`, and `Player` from `@/lib/cricket-data`
+- Defined local `PlayerData` and `TeamData` interfaces matching API response shapes
+- Replaced static data with `apiGet("/api/players")` and `apiGet("/api/teams")` fetch on mount via `useEffect` + `useCallback`
+- Implemented real Add Player via `apiPost("/api/players", payload)` with validation (name + teamId required)
+- Implemented real Edit Player via `apiPut("/api/players", { id, ...fields })`
+- Implemented real Delete Player via `apiDelete("/api/players", id)` with confirmation dialog
+- Added full loading skeleton UI during initial data fetch (stats cards, filters, table rows, mobile cards all skeletonized)
+- Added `submitting` state for dialog submit buttons with Loader2 spinner
+- Added toast notifications (`sonner`) on all CRUD operations: success for create/update/delete, error on failure
+- Added delete confirmation `AlertDialog` instead of inline delete action
+- Team selector in Add/Edit dialog now dynamically renders options from `/api/teams` API (maps by teamId, shows team name)
+- Added `bestBatting`, `bestBowling`, and `isCaptain` (Checkbox) fields to the Add/Edit dialog form
+- Stats cards now compute from live API data (total, batsmen, bowlers, all-rounders counts)
+- Auto-refreshes player and team lists after every mutation via `refreshData()` callback
+- Added empty state with icon, message, and "Add Player" CTA when no players exist or no filters match
+- Preserved ALL existing UI: stats cards, role filter tabs, search, sortable table columns, captain badge, team color badges, mobile cards, pagination, add/edit dialog
+- ESLint passes with zero errors
+
+Stage Summary:
+- Admin Players page now fully powered by PostgreSQL API (GET/POST/PUT/DELETE)
+- Loading skeletons during initial data fetch for all UI sections
+- Toast notifications on every CRUD success/error
+- Delete confirmation dialog with loading state
+- Dynamic team selector from API
+- All responsive UI preserved (mobile cards + desktop table + pagination + role filter tabs)
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Rewrite admin Settings page to use real API calls instead of mock data
+
+Work Log:
+- Read existing admin/settings/page.tsx (4 tabs with mock data), api.ts helpers, cricket-data.ts defaults
+- Removed static import of `tournamentInfo` from `@/lib/cricket-data` — no longer needed
+- Added imports: `useEffect`, `useCallback` from React; `toast` from sonner; `apiGet`, `apiPut` from `@/lib/api`; `Skeleton` from shadcn; `Loader2` from lucide
+- Defined default value objects for all 4 form groups (generalForm, matchRules, prizes, displaySettings) as constants outside the component
+- Defined `BOOLEAN_KEYS` set for all known boolean fields and a `parseApiValue()` helper to convert "true"/"false" strings to native booleans
+- Replaced static initial state with `useEffect` + `useCallback` that fetches from `apiGet("/api/settings")` on mount
+- API response is a flat `Record<string, string>`; values are mapped to each form group with fallbacks to defaults
+- Handles ambiguous key names (API returns `venue` and `prizePool` while forms use `venueName` and `totalPrizePool`) with dual-key fallback
+- Added `handleSave()` that merges all 4 form groups into a single flat key-value payload (boolean values stringified) and calls `apiPut("/api/settings", payload)`
+- Added `loading` state: shows full skeleton UI (header, tab bar, 3 card skeletons with form fields) during initial fetch
+- Added `saving` state: "Save Changes" button shows `Loader2` spinner + "Saving..." text while PUT is in flight; button is disabled
+- Toast notifications via `sonner`: success toast on save, error toast on fetch failure or save failure
+- Preserved ALL existing UI: 4 tabs (General / Match Rules / Prizes / Display), all form fields, Select dropdowns, Switch toggles, ₹ prefixed prize inputs, responsive grid layouts
+- ESLint passes with zero errors
+
+Stage Summary:
+- Admin Settings page now fully powered by PostgreSQL API (GET/PUT /api/settings)
+- Loading skeleton UI during initial settings fetch
+- Save button with spinner and disabled state during PUT
+- Toast notifications on fetch error and save success/failure
+- Boolean values properly converted between API strings ("true"/"false") and native booleans
+- Default values used as fallback when API returns no data or missing keys
+- All 4 tabs and responsive UI preserved exactly
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Rewrite admin Standings page to use real API calls instead of mock data
+
+Work Log:
+- Read existing admin/standings/page.tsx (mock data from cricket-data.ts), api.ts helpers, /api/standings route, StatsCard component
+- Removed static imports of `teams` and `Team` from `@/lib/cricket-data`; kept `tournamentInfo` (for totalMatches) and `Team` type
+- Replaced static `sortedTeams` array with `apiGet("/api/standings")` fetch on mount via `useEffect` + `useCallback`
+- Extended fetched teams with computed `form` array using `generateForm()` helper (W/L/D/N dots from wins/losses/draws)
+- Implemented real Edit Standings via `apiPut("/api/standings", { id, points, nrr, wins, losses, draws, matchesPlayed })`
+- Enhanced edit dialog: added fields for Matches, Wins, Losses, Draws alongside existing Points and NRR fields
+- Added `saving` state with `Loader2` spinner on Save button during PUT request
+- Added validation: all numeric fields must be valid integers, NRR must be non-empty
+- On successful save: updates local state with API response, re-sorts by points desc / NRR desc, closes dialog
+- Added full loading skeleton UI during initial data fetch: header, alert, stats cards, table rows (desktop), mobile cards all skeletonized
+- Added toast notifications (`sonner`) on: fetch failure, validation error, save success, save failure, CSV export success
+- Added Sonner `<Toaster />` component to admin layout (`src/app/admin/layout.tsx`) for toast rendering
+- Added "Refresh" button in header to manually re-fetch standings data
+- Export CSV button now generates CSV from live fetched data (Pos, Team, Short, M, W, L, D, NRR, Pts, Captain)
+- Stats cards compute from live API data (total played = sum/2, remaining = totalMatches - played, leader = first team, closest race = adjacent teams with ≤1 point diff)
+- Preserved ALL existing UI: qualification zones (green top 4, red bottom 4), form dots, NRR color coding (green/red), position icons (trophy/medal/award), desktop table, mobile cards, qualification legend, edit dialog
+- ESLint passes with zero errors
+
+Stage Summary:
+- Admin Standings page now fully powered by PostgreSQL API (GET/PUT /api/standings)
+- Loading skeleton UI during initial data fetch for all sections
+- Enhanced edit dialog with all 6 editable fields (M, W, L, D, Pts, NRR)
+- Toast notifications on save success/error and CSV export
+- CSV export works with live fetched data
+- Refresh button to manually re-fetch standings
+- All responsive UI preserved (mobile cards + desktop table + stats cards + legend)
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Rewrite admin Dashboard page to use real API data instead of mock data
+
+Work Log:
+- Read existing admin/page.tsx (mock data from cricket-data.ts), api.ts helpers, all 5 API routes (teams, players, fixtures, gallery, settings), Prisma schema
+- Removed all static imports: `teams`, `fixtures`, `topPlayers`, `recentResults`, `liveMatchData`, `tournamentInfo` from `@/lib/cricket-data`
+- Added imports: `useEffect`, `useState`, `useMemo` from React; `apiGet` from `@/lib/api`; `Skeleton` from shadcn; `Loader2` from lucide
+- Defined local TypeScript interfaces: `ApiTeam`, `ApiPlayer`, `ApiFixture`, `ApiGalleryImage`, `Settings` matching exact API response shapes
+- Replaced all static data with `Promise.allSettled` parallel fetch on mount: teams, players, fixtures, gallery, settings
+- Computed stats dynamically from real data: totalTeams, totalPlayers, completedCount, liveCount, upcomingCount, totalFixtures, prizePool
+- Generated bar chart data from real teams sorted by points (shortName, points, wins, losses, color)
+- Generated pie chart data from real fixture statuses (COMPLETED/LIVE/UPCOMING counts)
+- Found top scorer (sorted players by runs desc) and top wicket taker (sorted by wickets desc) from real player data
+- Built recent completed fixtures table from real data (last 5 COMPLETED fixtures sorted by matchNumber desc)
+- Built live match card: conditionally renders live fixture card (red border/pulse) when status === "LIVE", or "No live match" placeholder with upcoming count
+- Built recent activity feed from derived data: live fixture alert, recent completed results, latest gallery uploads, top scorer highlight
+- Added `formatRelativeTime()` helper for gallery upload timestamps
+- Added full `DashboardSkeleton` component: matching skeleton placeholders for all 7 sections (stats grid, charts, live match, activity, performers, quick actions, results table)
+- Added error state with retry button when all API calls fail
+- Quick Actions buttons now link to actual admin routes using `<a>` tags with `asChild`
+- Recent Results "View All" button links to /admin/fixtures
+- Season badge in chart header reads from `settings.season` or falls back to "Season 4"
+- Charts show "No data available yet" placeholder when arrays are empty
+- Top Performers show "No player data available yet" when no players exist
+- Recent Results show "No completed matches yet" when no COMPLETED fixtures
+- Recent Activity shows "No recent activity" when feed is empty
+- Preserved ALL existing UI: StatsCard grid (4 cards), Recharts BarChart + PieChart, live match card (red themed) / placeholder, recent activity feed, top performers (Orange/Purple cap), quick actions grid (6 buttons), recent results table
+- ESLint passes with zero errors
+
+Stage Summary:
+- Admin Dashboard page now fully powered by PostgreSQL API (5 parallel GET requests on mount)
+- Loading skeleton UI during initial fetch (matching placeholders for all sections)
+- Error state with retry button when all API calls fail
+- All stats computed dynamically from real data
+- Charts generated from real teams and fixtures data
+- Top performers derived from real player statistics
+- Live match card conditionally shown based on fixture status
+- Recent activity feed built from derived data (fixtures + gallery + player highlights)
+- Quick actions now link to real admin routes
+- Graceful empty states when no data exists
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Wire HeroSection and navbar live indicator to real API data
+
+Work Log:
+- Read existing hero-section.tsx (imports liveMatchData + recentResults as static data from cricket-data.ts)
+- Read existing page.tsx (imports liveMatchData for navbar live indicator)
+- Read cricket-data.ts (fetchFixtures, Fixture type, tournamentInfo static data)
+- Read /api/settings route (returns flat Record<string, string>)
+
+### hero-section.tsx changes:
+- Removed static imports of `liveMatchData` and `recentResults` from `@/lib/cricket-data`
+- Added imports: `fetchFixtures`, `type Fixture`, `useMemo` from React, `Radio` from lucide
+- Added state: `fixtures`, `settings` (Record<string, string>), updated `loadData` to fetch teams + fixtures + settings in parallel via `Promise.all`
+- Derived `liveMatch` via `useMemo`: `fixtures.find(f => f.status === "live")`
+- Derived `recentResults` via `useMemo`: `fixtures.filter(f => f.status === "completed").slice(-5).reverse()`
+- Derived dynamic stats from settings API with fallback to `tournamentInfo`: `totalTeams`, `totalMatches`, `totalPlayers`, `prizePool`
+- Simplified live match card: removed batsmen/bowler/currentOver/lastOver detail sections, now shows team names, score (split from fixture.score), venue from fixture data
+- Added colored team avatars using `team1Color`/`team2Color` with shortName initials
+- Added conditional result display below the score when `liveMatch.result` exists
+- Added "No live match right now" placeholder card with Radio icon when no live fixture found
+- Added loading skeleton for live match section during data fetch
+- Added loading skeleton + empty state for recent results section
+- Kept all animations, glass effects, background blobs, and existing UI structure intact
+
+### page.tsx changes:
+- Removed static import of `liveMatchData` from `@/lib/cricket-data`
+- Added imports: `useEffect`, `fetchFixtures`, `type Fixture`
+- Added state: `liveMatch` (Fixture | null), `fixturesLoaded` (boolean)
+- Added `useEffect` to fetch fixtures on mount and derive live match
+- Desktop live indicator: conditionally rendered only when `fixturesLoaded && liveMatch` is truthy; shows `team1Short vs team2Short • M{matchNumber}`
+- Mobile live indicator: same conditional rendering in mobile menu
+- When no live match exists (or data hasn't loaded), indicators are hidden (no flash/FOUC)
+- Kept all existing UI structure, animations, and responsive design intact
+
+- ESLint passes with zero errors
+- Dev server confirms all API calls succeed: /api/teams 200, /api/fixtures 200, /api/settings 200
+
+Stage Summary:
+- HeroSection now fully powered by real API data (fixtures, teams, settings)
+- Live match card dynamically shows live fixture or "No live match" placeholder
+- Recent results derived from completed fixtures (last 5, newest first)
+- Tournament stats (teams, matches, players, prize pool) pulled from /api/settings with static fallback
+- Navbar live indicator (desktop + mobile) shows/hides dynamically based on live fixture
+- Loading skeletons prevent flash of empty content
+- All existing UI, animations, and responsive design preserved

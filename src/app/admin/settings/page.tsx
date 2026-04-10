@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { tournamentInfo } from "@/lib/cricket-data";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import { apiGet, apiPut } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -16,59 +18,274 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Settings2, Gamepad2, Trophy, Monitor } from "lucide-react";
+import { Save, Settings2, Gamepad2, Trophy, Monitor, Loader2 } from "lucide-react";
+
+// --------------- Default values (fallback when API returns nothing) ---------------
+
+const DEFAULT_GENERAL = {
+  tournamentName: "Gully Cricket Premier League",
+  season: "4",
+  format: "T8",
+  startDate: "15 Jan 2025",
+  endDate: "15 Feb 2025",
+  venueName: "Shivaji Park",
+  city: "Mumbai",
+  state: "Maharashtra",
+  groundsAvailable: "2",
+  organizationName: "Mumbai Gully Cricket Association",
+  contactEmail: "info@gcpl-mumbai.com",
+  contactPhone: "+91 98765 43210",
+  website: "https://gcpl-mumbai.com",
+};
+
+const DEFAULT_MATCH_RULES = {
+  oversPerInnings: "8",
+  maxPlayersPerTeam: "11",
+  wideBallRule: "1 run",
+  noBallRule: "free hit",
+  powerplayOvers: "2",
+  dlsMethod: true,
+  superOver: true,
+  lbwRule: true,
+  mankading: false,
+};
+
+const DEFAULT_PRIZES = {
+  totalPrizePool: "₹50,000",
+  winnerPrize: "₹25,000",
+  runnerUpPrize: "₹12,000",
+  bestBatsman: "₹3,000",
+  bestBowler: "₹3,000",
+  manOfTournament: "₹5,000",
+};
+
+const DEFAULT_DISPLAY = {
+  liveScoreHomepage: true,
+  enableGallery: true,
+  showPlayerStats: true,
+  darkLightTheme: true,
+  matchStartNotification: true,
+  resultAnnouncement: true,
+  newPhotoUploadAlert: false,
+};
+
+// --------------- Boolean field keys (known to come as "true"/"false" strings) ---------------
+
+const BOOLEAN_KEYS = new Set([
+  "dlsMethod",
+  "superOver",
+  "lbwRule",
+  "mankading",
+  "liveScoreHomepage",
+  "enableGallery",
+  "showPlayerStats",
+  "darkLightTheme",
+  "matchStartNotification",
+  "resultAnnouncement",
+  "newPhotoUploadAlert",
+]);
+
+/** Safely parse a string value from the API into the correct JS type */
+function parseApiValue(key: string, value: string): string | boolean {
+  if (BOOLEAN_KEYS.has(key)) {
+    return value === "true";
+  }
+  return value;
+}
+
+// --------------- Component ---------------
 
 export default function SettingsPage() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   // General Tab State
-  const [generalForm, setGeneralForm] = useState({
-    tournamentName: tournamentInfo.name,
-    season: "4",
-    format: "T8",
-    startDate: "15 Jan 2025",
-    endDate: "15 Feb 2025",
-    venueName: "Shivaji Park",
-    city: tournamentInfo.city,
-    state: tournamentInfo.state,
-    groundsAvailable: "2",
-    organizationName: "Mumbai Gully Cricket Association",
-    contactEmail: "info@gcpl-mumbai.com",
-    contactPhone: "+91 98765 43210",
-    website: "https://gcpl-mumbai.com",
-  });
+  const [generalForm, setGeneralForm] = useState(DEFAULT_GENERAL);
 
   // Match Rules State
-  const [matchRules, setMatchRules] = useState({
-    oversPerInnings: "8",
-    maxPlayersPerTeam: "11",
-    wideBallRule: "1 run",
-    noBallRule: "free hit",
-    powerplayOvers: "2",
-    dlsMethod: true,
-    superOver: true,
-    lbwRule: true,
-    mankading: false,
-  });
+  const [matchRules, setMatchRules] = useState(DEFAULT_MATCH_RULES);
 
   // Prizes State
-  const [prizes, setPrizes] = useState({
-    totalPrizePool: "₹50,000",
-    winnerPrize: "₹25,000",
-    runnerUpPrize: "₹12,000",
-    bestBatsman: "₹3,000",
-    bestBowler: "₹3,000",
-    manOfTournament: "₹5,000",
-  });
+  const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
 
   // Display State
-  const [displaySettings, setDisplaySettings] = useState({
-    liveScoreHomepage: true,
-    enableGallery: true,
-    showPlayerStats: true,
-    darkLightTheme: true,
-    matchStartNotification: true,
-    resultAnnouncement: true,
-    newPhotoUploadAlert: false,
-  });
+  const [displaySettings, setDisplaySettings] = useState(DEFAULT_DISPLAY);
+
+  // --------------- Fetch settings from API on mount ---------------
+
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data: Record<string, string> = await apiGet("/api/settings");
+
+      if (data && Object.keys(data).length > 0) {
+        // Populate general form
+        setGeneralForm({
+          tournamentName: data.tournamentName ?? DEFAULT_GENERAL.tournamentName,
+          season: data.season ?? DEFAULT_GENERAL.season,
+          format: data.format ?? DEFAULT_GENERAL.format,
+          startDate: data.startDate ?? DEFAULT_GENERAL.startDate,
+          endDate: data.endDate ?? DEFAULT_GENERAL.endDate,
+          venueName: data.venue ?? data.venueName ?? DEFAULT_GENERAL.venueName,
+          city: data.city ?? DEFAULT_GENERAL.city,
+          state: data.state ?? DEFAULT_GENERAL.state,
+          groundsAvailable: data.groundsAvailable ?? DEFAULT_GENERAL.groundsAvailable,
+          organizationName: data.organizationName ?? DEFAULT_GENERAL.organizationName,
+          contactEmail: data.contactEmail ?? DEFAULT_GENERAL.contactEmail,
+          contactPhone: data.contactPhone ?? DEFAULT_GENERAL.contactPhone,
+          website: data.website ?? DEFAULT_GENERAL.website,
+        });
+
+        // Populate match rules
+        setMatchRules({
+          oversPerInnings: data.oversPerInnings ?? DEFAULT_MATCH_RULES.oversPerInnings,
+          maxPlayersPerTeam: data.maxPlayersPerTeam ?? DEFAULT_MATCH_RULES.maxPlayersPerTeam,
+          wideBallRule: data.wideBallRule ?? DEFAULT_MATCH_RULES.wideBallRule,
+          noBallRule: data.noBallRule ?? DEFAULT_MATCH_RULES.noBallRule,
+          powerplayOvers: data.powerplayOvers ?? DEFAULT_MATCH_RULES.powerplayOvers,
+          dlsMethod: parseApiValue("dlsMethod", String(data.dlsMethod ?? "true")) as boolean,
+          superOver: parseApiValue("superOver", String(data.superOver ?? "true")) as boolean,
+          lbwRule: parseApiValue("lbwRule", String(data.lbwRule ?? "true")) as boolean,
+          mankading: parseApiValue("mankading", String(data.mankading ?? "false")) as boolean,
+        });
+
+        // Populate prizes
+        setPrizes({
+          totalPrizePool: data.prizePool ?? data.totalPrizePool ?? DEFAULT_PRIZES.totalPrizePool,
+          winnerPrize: data.winnerPrize ?? DEFAULT_PRIZES.winnerPrize,
+          runnerUpPrize: data.runnerUpPrize ?? DEFAULT_PRIZES.runnerUpPrize,
+          bestBatsman: data.bestBatsman ?? DEFAULT_PRIZES.bestBatsman,
+          bestBowler: data.bestBowler ?? DEFAULT_PRIZES.bestBowler,
+          manOfTournament: data.manOfTournament ?? DEFAULT_PRIZES.manOfTournament,
+        });
+
+        // Populate display settings
+        setDisplaySettings({
+          liveScoreHomepage: parseApiValue("liveScoreHomepage", String(data.liveScoreHomepage ?? "true")) as boolean,
+          enableGallery: parseApiValue("enableGallery", String(data.enableGallery ?? "true")) as boolean,
+          showPlayerStats: parseApiValue("showPlayerStats", String(data.showPlayerStats ?? "true")) as boolean,
+          darkLightTheme: parseApiValue("darkLightTheme", String(data.darkLightTheme ?? "true")) as boolean,
+          matchStartNotification: parseApiValue("matchStartNotification", String(data.matchStartNotification ?? "true")) as boolean,
+          resultAnnouncement: parseApiValue("resultAnnouncement", String(data.resultAnnouncement ?? "true")) as boolean,
+          newPhotoUploadAlert: parseApiValue("newPhotoUploadAlert", String(data.newPhotoUploadAlert ?? "false")) as boolean,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch settings:", err);
+      toast.error("Failed to load settings. Using defaults.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // --------------- Save all settings ---------------
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Merge all form groups into a single flat key-value object
+      const payload: Record<string, string> = {
+        // General
+        tournamentName: generalForm.tournamentName,
+        season: generalForm.season,
+        format: generalForm.format,
+        startDate: generalForm.startDate,
+        endDate: generalForm.endDate,
+        venue: generalForm.venueName,
+        venueName: generalForm.venueName,
+        city: generalForm.city,
+        state: generalForm.state,
+        groundsAvailable: generalForm.groundsAvailable,
+        organizationName: generalForm.organizationName,
+        contactEmail: generalForm.contactEmail,
+        contactPhone: generalForm.contactPhone,
+        website: generalForm.website,
+        // Match Rules
+        oversPerInnings: matchRules.oversPerInnings,
+        maxPlayersPerTeam: matchRules.maxPlayersPerTeam,
+        wideBallRule: matchRules.wideBallRule,
+        noBallRule: matchRules.noBallRule,
+        powerplayOvers: matchRules.powerplayOvers,
+        dlsMethod: String(matchRules.dlsMethod),
+        superOver: String(matchRules.superOver),
+        lbwRule: String(matchRules.lbwRule),
+        mankading: String(matchRules.mankading),
+        // Prizes
+        prizePool: prizes.totalPrizePool,
+        totalPrizePool: prizes.totalPrizePool,
+        winnerPrize: prizes.winnerPrize,
+        runnerUpPrize: prizes.runnerUpPrize,
+        bestBatsman: prizes.bestBatsman,
+        bestBowler: prizes.bestBowler,
+        manOfTournament: prizes.manOfTournament,
+        // Display
+        liveScoreHomepage: String(displaySettings.liveScoreHomepage),
+        enableGallery: String(displaySettings.enableGallery),
+        showPlayerStats: String(displaySettings.showPlayerStats),
+        darkLightTheme: String(displaySettings.darkLightTheme),
+        matchStartNotification: String(displaySettings.matchStartNotification),
+        resultAnnouncement: String(displaySettings.resultAnnouncement),
+        newPhotoUploadAlert: String(displaySettings.newPhotoUploadAlert),
+      };
+
+      await apiPut("/api/settings", payload);
+      toast.success("Settings saved successfully!");
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      toast.error("Failed to save settings. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // --------------- Loading skeleton ---------------
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-36" />
+        </div>
+
+        {/* Tab bar skeleton */}
+        <div className="flex gap-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-28" />
+          ))}
+        </div>
+
+        {/* Card skeletons */}
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="border-border/50">
+            <CardHeader className="pb-4">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  // --------------- Render ---------------
 
   return (
     <div className="space-y-6">
@@ -78,9 +295,13 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-foreground">Settings</h2>
           <p className="text-sm text-muted-foreground">Configure tournament settings and preferences</p>
         </div>
-        <Button className="gap-2">
-          <Save className="w-4 h-4" />
-          Save Changes
+        <Button className="gap-2" onClick={handleSave} disabled={saving}>
+          {saving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 

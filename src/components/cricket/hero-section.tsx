@@ -1,40 +1,68 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin, Calendar, Users, IndianRupee, Zap,
-  ChevronRight, Play, Star, RefreshCw,
+  ChevronRight, Play, Star, RefreshCw, Radio,
 } from "lucide-react";
-import { tournamentInfo, fetchTeams, liveMatchData, recentResults, type Team } from "@/lib/cricket-data";
+import { tournamentInfo, fetchTeams, fetchFixtures, type Team, type Fixture } from "@/lib/cricket-data";
 
 export function HeroSection() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadTeams = async () => {
+  const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchTeams();
-      setTeams(data);
+      const [teamsData, fixturesData, settingsRes] = await Promise.all([
+        fetchTeams(),
+        fetchFixtures(),
+        fetch("/api/settings").then((r) => r.json()),
+      ]);
+      setTeams(teamsData);
+      setFixtures(fixturesData);
+      setSettings(settingsRes);
     } catch {
-      setError("Failed to load standings.");
+      setError("Failed to load data.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadTeams();
+    loadData();
   }, []);
+
+  const liveMatch = useMemo(
+    () => fixtures.find((f) => f.status === "live"),
+    [fixtures]
+  );
+
+  const recentResults = useMemo(
+    () =>
+      fixtures
+        .filter((f) => f.status === "completed")
+        .slice(-5)
+        .reverse(),
+    [fixtures]
+  );
 
   const topTeam = teams[0];
   const sortedTeams = [...teams].sort((a, b) => b.points - a.points).slice(0, 3);
+
+  // Derive dynamic stats from settings or fall back to tournamentInfo
+  const totalTeams = settings.totalTeams || tournamentInfo.totalTeams;
+  const totalMatches = settings.totalMatches || tournamentInfo.totalMatches;
+  const totalPlayers = settings.totalPlayers || tournamentInfo.totalPlayers;
+  const prizePool = settings.prizePool || settings.totalPrizePool || tournamentInfo.prizePool;
 
   return (
     <div className="relative overflow-hidden">
@@ -69,10 +97,10 @@ export function HeroSection() {
         {/* Stats */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {[
-            { icon: Users, label: "Teams", value: tournamentInfo.totalTeams, color: "text-green-600 dark:text-green-400" },
-            { icon: Calendar, label: "Matches", value: tournamentInfo.totalMatches, color: "text-lime-600 dark:text-lime-400" },
-            { icon: Users, label: "Players", value: tournamentInfo.totalPlayers, color: "text-yellow-600 dark:text-yellow-400" },
-            { icon: IndianRupee, label: "Prize Pool", value: tournamentInfo.prizePool, color: "text-orange-600 dark:text-orange-400" },
+            { icon: Users, label: "Teams", value: totalTeams, color: "text-green-600 dark:text-green-400" },
+            { icon: Calendar, label: "Matches", value: totalMatches, color: "text-lime-600 dark:text-lime-400" },
+            { icon: Users, label: "Players", value: totalPlayers, color: "text-yellow-600 dark:text-yellow-400" },
+            { icon: IndianRupee, label: "Prize Pool", value: prizePool, color: "text-orange-600 dark:text-orange-400" },
           ].map((stat, i) => (
             <div key={i} className="glass rounded-xl p-3 sm:p-4 text-center hover:bg-accent/50 transition-colors">
               <stat.icon className={`w-5 h-5 mx-auto mb-2 ${stat.color}`} />
@@ -84,73 +112,106 @@ export function HeroSection() {
 
         {/* Live Match */}
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.2 }} className="mb-8">
-          <div className="relative overflow-hidden rounded-2xl border live-card-bg glow-green">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-lime-500 to-green-500" />
-            <div className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
-                  <span className="text-sm font-semibold text-red-600 dark:text-red-400">LIVE</span>
-                  <Badge variant="secondary" className="text-xs bg-card/80">Match {liveMatchData.matchNumber}</Badge>
-                </div>
-                <span className="text-xs text-muted-foreground">Shivaji Park Ground A</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 text-center">
-                  <div className="text-3xl sm:text-4xl mb-2">⚡</div>
-                  <h3 className="text-sm sm:text-base font-bold">{liveMatchData.team1.name}</h3>
-                  <p className="text-xl sm:text-3xl font-extrabold text-green-600 dark:text-green-400 mt-1">{liveMatchData.team1.score}</p>
-                  <p className="text-xs text-muted-foreground">({liveMatchData.team1.overs} ov) • RR: {liveMatchData.team1.runRate}</p>
-                </div>
-                <div className="flex flex-col items-center gap-1 px-2">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full inner-card flex items-center justify-center">
-                    <span className="text-xs font-bold text-muted-foreground">VS</span>
+          {loading ? (
+            <div className="relative overflow-hidden rounded-2xl border border-border/50 glass">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-muted" />
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-2 h-2 rounded-full" />
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-5 w-16" />
                   </div>
-                  <p className="text-xs text-muted-foreground">Target: {liveMatchData.target}</p>
+                  <Skeleton className="h-3 w-32" />
                 </div>
-                <div className="flex-1 text-center">
-                  <div className="text-3xl sm:text-4xl mb-2">⚔️</div>
-                  <h3 className="text-sm sm:text-base font-bold">{liveMatchData.team2.name}</h3>
-                  <p className="text-xl sm:text-3xl font-extrabold text-purple-600 dark:text-purple-400 mt-1">Yet to bat</p>
-                  <p className="text-xs text-muted-foreground">Need {liveMatchData.target} runs</p>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="inner-card rounded-lg p-3">
-                    <p className="text-muted-foreground mb-1">Batting</p>
-                    {liveMatchData.batsmen.map((b, i) => (
-                      <div key={i} className={`flex justify-between ${b.isOnStrike ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
-                        <span>{b.name} {b.isOnStrike ? "*" : ""}</span>
-                        <span className="font-mono">{b.runs}({b.balls})</span>
-                      </div>
-                    ))}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 text-center">
+                    <Skeleton className="w-12 h-12 rounded-full mx-auto mb-2" />
+                    <Skeleton className="h-5 w-28 mx-auto mb-1" />
+                    <Skeleton className="h-8 w-20 mx-auto mb-1" />
+                    <Skeleton className="h-3 w-24 mx-auto" />
                   </div>
-                  <div className="inner-card rounded-lg p-3">
-                    <p className="text-muted-foreground mb-1">Bowling</p>
-                    <div className="flex justify-between"><span>{liveMatchData.bowler.name}</span><span className="font-mono">{liveMatchData.bowler.wickets}/{liveMatchData.bowler.runs}</span></div>
-                    <div className="flex justify-between text-muted-foreground"><span>Overs</span><span className="font-mono">{liveMatchData.bowler.overs}</span></div>
+                  <div className="flex flex-col items-center gap-1 px-2">
+                    <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-full" />
+                    <Skeleton className="h-3 w-16 mt-1" />
                   </div>
-                  <div className="inner-card rounded-lg p-3">
-                    <p className="text-muted-foreground mb-1">This Over</p>
-                    <div className="flex gap-1.5">
-                      {liveMatchData.currentOver.map((ball, i) => (
-                        <span key={i} className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ball === "W" ? "bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400"
-                          : ball === "4" ? "bg-blue-100 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                          : ball === "6" ? "bg-green-100 dark:bg-green-500/15 text-green-600 dark:text-green-400"
-                          : "bg-muted text-muted-foreground"
-                        }`}>{ball}</span>
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground mt-1">Last over: {liveMatchData.lastOver.join(" ")}</p>
+                  <div className="flex-1 text-center">
+                    <Skeleton className="w-12 h-12 rounded-full mx-auto mb-2" />
+                    <Skeleton className="h-5 w-28 mx-auto mb-1" />
+                    <Skeleton className="h-8 w-20 mx-auto mb-1" />
+                    <Skeleton className="h-3 w-24 mx-auto" />
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : liveMatch ? (
+            <div className="relative overflow-hidden rounded-2xl border live-card-bg glow-green">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-lime-500 to-green-500" />
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse-dot" />
+                    <span className="text-sm font-semibold text-red-600 dark:text-red-400">LIVE</span>
+                    <Badge variant="secondary" className="text-xs bg-card/80">Match {liveMatch.matchNumber}</Badge>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{liveMatch.venue}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 text-center">
+                    <div
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-xl sm:text-2xl mx-auto mb-2"
+                      style={{ backgroundColor: liveMatch.team1Color + "20" }}
+                    >
+                      <span style={{ color: liveMatch.team1Color }}>{liveMatch.team1Short}</span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-bold">{liveMatch.team1}</h3>
+                    <p className="text-lg sm:text-xl font-extrabold mt-1" style={{ color: liveMatch.team1Color }}>
+                      {liveMatch.score?.split(" vs ")[0] || "In progress"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 px-2">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full inner-card flex items-center justify-center">
+                      <span className="text-xs font-bold text-muted-foreground">VS</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <div
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-xl sm:text-2xl mx-auto mb-2"
+                      style={{ backgroundColor: liveMatch.team2Color + "20" }}
+                    >
+                      <span style={{ color: liveMatch.team2Color }}>{liveMatch.team2Short}</span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-bold">{liveMatch.team2}</h3>
+                    <p className="text-lg sm:text-xl font-extrabold mt-1" style={{ color: liveMatch.team2Color }}>
+                      {liveMatch.score?.split(" vs ")[1] || "Yet to bat"}
+                    </p>
+                  </div>
+                </div>
+
+                {liveMatch.result && (
+                  <p className="text-center text-sm font-medium text-green-600 dark:text-green-400 mt-3 pt-3 border-t border-border/50">
+                    {liveMatch.result}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="relative overflow-hidden rounded-2xl border border-border/50 glass">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-muted" />
+              <div className="p-4 sm:p-6">
+                <div className="flex flex-col items-center justify-center py-4 text-center">
+                  <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                    <Radio className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-base font-semibold mb-1">No live match right now</h3>
+                  <p className="text-sm text-muted-foreground max-w-xs">
+                    Check the fixtures tab for upcoming matches and schedules.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Recent Results + Top Team */}
@@ -159,23 +220,47 @@ export function HeroSection() {
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Play className="w-4 h-4 text-green-600 dark:text-green-400" /> Recent Results
             </h2>
-            <div className="space-y-3">
-              {recentResults.map((match, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl inner-card hover:bg-muted/80 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex items-center gap-2 text-sm min-w-0">
-                      <span className="font-semibold truncate">{match.team1Short}</span>
-                      <span className="text-muted-foreground">vs</span>
-                      <span className="font-semibold truncate">{match.team2Short}</span>
+            {loading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl inner-card">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-6" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <div className="text-right">
+                      <Skeleton className="h-4 w-32 mb-1" />
+                      <Skeleton className="h-3 w-16" />
                     </div>
                   </div>
-                  <div className="text-right shrink-0 ml-2">
-                    <p className="text-xs font-medium text-green-600 dark:text-green-400">{match.result}</p>
-                    <p className="text-xs text-muted-foreground">{match.margin}</p>
+                ))}
+              </div>
+            ) : recentResults.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground">No completed matches yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentResults.map((match) => (
+                  <div key={match.id} className="flex items-center justify-between p-3 rounded-xl inner-card hover:bg-muted/80 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2 text-sm min-w-0">
+                        <span className="font-semibold truncate">{match.team1Short}</span>
+                        <span className="text-muted-foreground">vs</span>
+                        <span className="font-semibold truncate">{match.team2Short}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className="text-xs font-medium text-green-600 dark:text-green-400">{match.result}</p>
+                      {match.score && (
+                        <p className="text-xs text-muted-foreground">{match.score}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="glass rounded-2xl p-4 sm:p-6">
@@ -205,7 +290,7 @@ export function HeroSection() {
             {!loading && error && (
               <div className="text-center py-4">
                 <p className="text-destructive text-sm mb-2">{error}</p>
-                <Button variant="ghost" size="sm" onClick={loadTeams}>
+                <Button variant="ghost" size="sm" onClick={loadData}>
                   <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Retry
                 </Button>
               </div>

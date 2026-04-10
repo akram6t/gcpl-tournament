@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { fixtures, teams } from "@/lib/cricket-data";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { StatsCard } from "@/components/admin/stats-card";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -59,8 +58,48 @@ import {
   Clock,
   MapPin,
   Trophy,
+  Loader2,
 } from "lucide-react";
-import { Fixture } from "@/lib/cricket-data";
+import { toast } from "sonner";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+
+// ============ Types ============
+
+interface ApiTeam {
+  id: string;
+  name: string;
+  shortName: string;
+  color: string;
+  colorLight: string;
+  captain: string;
+  logo: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+  nrr: string;
+  matchesPlayed: number;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { players: number };
+}
+
+interface FixtureItem {
+  id: string;
+  matchNumber: number;
+  team1: string;
+  team1Short: string;
+  team1Color: string;
+  team2: string;
+  team2Short: string;
+  team2Color: string;
+  date: string;
+  time: string;
+  venue: string;
+  status: "completed" | "live" | "upcoming";
+  score?: string;
+  result?: string;
+}
 
 type StatusFilter = "all" | "live" | "completed" | "upcoming";
 
@@ -84,25 +123,80 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   },
 };
 
+// ============ Component ============
+
 export default function FixturesManagementPage() {
+  // Data state
+  const [fixtures, setFixtures] = useState<FixtureItem[]>([]);
+  const [teams, setTeams] = useState<ApiTeam[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // UI state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
-  const [editingFixture, setEditingFixture] = useState<Fixture | null>(null);
+  const [editingFixture, setEditingFixture] = useState<FixtureItem | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form state
   const [formData, setFormData] = useState({
-    team1: "",
-    team2: "",
+    team1Id: "",
+    team2Id: "",
     date: "",
     time: "",
     venue: "",
-    status: "upcoming" as Fixture["status"],
+    status: "upcoming" as string,
   });
   const [scoreData, setScoreData] = useState({
     score: "",
     result: "",
   });
+
+  // ============ Data Fetching ============
+
+  const loadFixtures = useCallback(async () => {
+    try {
+      const data = await apiGet<Record<string, unknown>[]>("/api/fixtures");
+      const normalized: FixtureItem[] = data.map((f) => ({
+        id: f.id as string,
+        matchNumber: f.matchNumber as number,
+        team1: f.team1 as string,
+        team1Short: f.team1Short as string,
+        team1Color: f.team1Color as string,
+        team2: f.team2 as string,
+        team2Short: f.team2Short as string,
+        team2Color: f.team2Color as string,
+        date: f.date as string,
+        time: f.time as string,
+        venue: f.venue as string,
+        status: ((f.status as string)?.toLowerCase() ?? "upcoming") as FixtureItem["status"],
+        score: (f.score as string) ?? undefined,
+        result: (f.result as string) ?? undefined,
+      }));
+      setFixtures(normalized);
+    } catch {
+      toast.error("Failed to load fixtures");
+    }
+  }, []);
+
+  const loadTeams = useCallback(async () => {
+    try {
+      const data = await apiGet<ApiTeam[]>("/api/teams");
+      setTeams(data);
+    } catch {
+      toast.error("Failed to load teams");
+    }
+  }, []);
+
+  useEffect(() => {
+    Promise.all([loadFixtures(), loadTeams()]).finally(() =>
+      setIsLoading(false)
+    );
+  }, [loadFixtures, loadTeams]);
+
+  // ============ Computed Values ============
 
   const completedCount = fixtures.filter((f) => f.status === "completed").length;
   const liveCount = fixtures.filter((f) => f.status === "live").length;
@@ -121,7 +215,7 @@ export default function FixturesManagementPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, statusFilter]);
+  }, [fixtures, searchQuery, statusFilter]);
 
   const totalPages = Math.ceil(filteredFixtures.length / ITEMS_PER_PAGE);
   const paginatedFixtures = filteredFixtures.slice(
@@ -129,24 +223,20 @@ export default function FixturesManagementPage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const openEditDialog = (fixture: Fixture) => {
-    setEditingFixture(fixture);
-    setFormData({
-      team1: fixture.team1,
-      team2: fixture.team2,
-      date: fixture.date,
-      time: fixture.time,
-      venue: fixture.venue,
-      status: fixture.status,
-    });
-    setDialogOpen(true);
+  // ============ Helpers ============
+
+  const getTeamIdByName = (name: string): string => {
+    const team = teams.find((t) => t.name === name);
+    return team?.id ?? "";
   };
+
+  // ============ CRUD Handlers ============
 
   const openAddDialog = () => {
     setEditingFixture(null);
     setFormData({
-      team1: "",
-      team2: "",
+      team1Id: "",
+      team2Id: "",
       date: "",
       time: "",
       venue: "",
@@ -155,7 +245,20 @@ export default function FixturesManagementPage() {
     setDialogOpen(true);
   };
 
-  const openScoreDialog = (fixture: Fixture) => {
+  const openEditDialog = (fixture: FixtureItem) => {
+    setEditingFixture(fixture);
+    setFormData({
+      team1Id: getTeamIdByName(fixture.team1),
+      team2Id: getTeamIdByName(fixture.team2),
+      date: fixture.date,
+      time: fixture.time,
+      venue: fixture.venue,
+      status: fixture.status,
+    });
+    setDialogOpen(true);
+  };
+
+  const openScoreDialog = (fixture: FixtureItem) => {
     setEditingFixture(fixture);
     setScoreData({
       score: fixture.score || "",
@@ -163,6 +266,162 @@ export default function FixturesManagementPage() {
     });
     setScoreDialogOpen(true);
   };
+
+  const handleSaveFixture = async () => {
+    if (!formData.team1Id || !formData.team2Id) {
+      toast.error("Please select both teams");
+      return;
+    }
+    if (formData.team1Id === formData.team2Id) {
+      toast.error("Please select two different teams");
+      return;
+    }
+    if (!formData.date || !formData.venue) {
+      toast.error("Date and venue are required");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        matchNumber: editingFixture?.matchNumber,
+        team1Id: formData.team1Id,
+        team2Id: formData.team2Id,
+        date: formData.date,
+        time: formData.time || "4:00 PM",
+        venue: formData.venue,
+        status: formData.status.toUpperCase(),
+      };
+
+      if (editingFixture) {
+        await apiPut("/api/fixtures", { id: editingFixture.id, ...payload });
+        toast.success(`Match #${editingFixture.matchNumber} updated successfully`);
+      } else {
+        await apiPost("/api/fixtures", payload);
+        toast.success("New match scheduled successfully");
+      }
+
+      setDialogOpen(false);
+      await loadFixtures();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save fixture");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateScore = async () => {
+    if (!editingFixture) return;
+
+    setIsSubmitting(true);
+    try {
+      // Fetch current fixture data to merge with score update
+      const currentTeam1Id = getTeamIdByName(editingFixture.team1);
+      const currentTeam2Id = getTeamIdByName(editingFixture.team2);
+
+      await apiPut("/api/fixtures", {
+        id: editingFixture.id,
+        matchNumber: editingFixture.matchNumber,
+        team1Id: currentTeam1Id,
+        team2Id: currentTeam2Id,
+        date: editingFixture.date,
+        time: editingFixture.time,
+        venue: editingFixture.venue,
+        status: editingFixture.status.toUpperCase(),
+        score: scoreData.score || null,
+        result: scoreData.result || null,
+      });
+
+      toast.success(`Score updated for Match #${editingFixture.matchNumber}`);
+      setScoreDialogOpen(false);
+      await loadFixtures();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update score");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (fixture: FixtureItem) => {
+    setIsSubmitting(true);
+    try {
+      await apiDelete("/api/fixtures", fixture.id);
+      toast.success(`Match #${fixture.matchNumber} deleted`);
+      await loadFixtures();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete fixture");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ============ Loading State ============
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border-border/50">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+                    <div className="h-7 w-10 bg-muted rounded animate-pulse" />
+                    <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="w-11 h-11 rounded-xl bg-muted animate-pulse" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Filter skeleton */}
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="h-9 w-full sm:w-80 bg-muted rounded animate-pulse" />
+              <div className="flex gap-3">
+                <div className="h-10 flex-1 sm:max-w-sm bg-muted rounded animate-pulse" />
+                <div className="h-10 w-36 bg-muted rounded animate-pulse" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Table skeleton */}
+        <Card className="border-border/50 hidden lg:block">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className="h-4 w-8 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                  <div className="flex-1 flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-muted animate-pulse" />
+                    <div className="h-4 w-28 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-6 bg-muted rounded animate-pulse" />
+                  <div className="flex-1 flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-muted animate-pulse" />
+                    <div className="h-4 w-28 bg-muted rounded animate-pulse" />
+                  </div>
+                  <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                  <div className="h-6 w-20 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-36 bg-muted rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ============ Render ============
 
   return (
     <div className="space-y-6">
@@ -254,254 +513,285 @@ export default function FixturesManagementPage() {
         </CardContent>
       </Card>
 
+      {/* Empty State */}
+      {!isLoading && filteredFixtures.length === 0 && (
+        <Card className="border-border/50">
+          <CardContent className="p-12 text-center">
+            <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-1">No fixtures found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchQuery || statusFilter !== "all"
+                ? "Try adjusting your search or filter."
+                : "Get started by scheduling the first match."}
+            </p>
+            {!searchQuery && statusFilter === "all" && (
+              <Button onClick={openAddDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Schedule Match
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Desktop Table */}
-      <Card className="border-border/50 hidden lg:block">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-20">Match</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Team 1</TableHead>
-                <TableHead className="text-center">vs</TableHead>
-                <TableHead>Team 2</TableHead>
-                <TableHead>Venue</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead>Score / Result</TableHead>
-                <TableHead className="w-12">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedFixtures.map((fixture) => (
-                <TableRow
-                  key={fixture.id}
-                  className="hover:bg-muted/50 transition-colors"
-                >
-                  <TableCell>
-                    <span className="text-sm font-semibold text-muted-foreground">
-                      #{fixture.matchNumber}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm text-foreground whitespace-nowrap">
-                    {fixture.date}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {fixture.time}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                        style={{ backgroundColor: fixture.team1Color }}
-                      >
-                        {fixture.team1Short}
-                      </div>
-                      <span className="font-medium text-sm text-foreground whitespace-nowrap">
-                        {fixture.team1}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className="text-muted-foreground font-semibold text-xs">vs</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                        style={{ backgroundColor: fixture.team2Color }}
-                      >
-                        {fixture.team2Short}
-                      </div>
-                      <span className="font-medium text-sm text-foreground whitespace-nowrap">
-                        {fixture.team2}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      <span className="truncate max-w-[140px]">{fixture.venue}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      {fixture.status === "live" && (
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                        </span>
-                      )}
-                      <Badge
-                        variant="outline"
-                        className={statusConfig[fixture.status].className}
-                      >
-                        {statusConfig[fixture.status].label}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="max-w-[200px]">
-                      {fixture.score && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {fixture.score}
-                        </p>
-                      )}
-                      {fixture.result && (
-                        <p className="text-xs font-medium text-green-600 dark:text-green-400 truncate flex items-center gap-1">
-                          <Trophy className="h-3 w-3 shrink-0" />
-                          {fixture.result}
-                        </p>
-                      )}
-                      {!fixture.score && !fixture.result && (
-                        <p className="text-xs text-muted-foreground italic">
-                          Not started
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(fixture)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openScoreDialog(fixture)}>
-                          <ClipboardEdit className="h-4 w-4 mr-2" />
-                          Update Score
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 dark:text-red-400">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+      {filteredFixtures.length > 0 && (
+        <Card className="border-border/50 hidden lg:block">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-20">Match</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Team 1</TableHead>
+                  <TableHead className="text-center">vs</TableHead>
+                  <TableHead>Team 2</TableHead>
+                  <TableHead>Venue</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead>Score / Result</TableHead>
+                  <TableHead className="w-12">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {paginatedFixtures.map((fixture) => (
+                  <TableRow
+                    key={fixture.id}
+                    className="hover:bg-muted/50 transition-colors"
+                  >
+                    <TableCell>
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        #{fixture.matchNumber}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-foreground whitespace-nowrap">
+                      {fixture.date}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {fixture.time}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                          style={{ backgroundColor: fixture.team1Color }}
+                        >
+                          {fixture.team1Short}
+                        </div>
+                        <span className="font-medium text-sm text-foreground whitespace-nowrap">
+                          {fixture.team1}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-muted-foreground font-semibold text-xs">vs</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                          style={{ backgroundColor: fixture.team2Color }}
+                        >
+                          {fixture.team2Short}
+                        </div>
+                        <span className="font-medium text-sm text-foreground whitespace-nowrap">
+                          {fixture.team2}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate max-w-[140px]">{fixture.venue}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {fixture.status === "live" && (
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                          </span>
+                        )}
+                        <Badge
+                          variant="outline"
+                          className={statusConfig[fixture.status].className}
+                        >
+                          {statusConfig[fixture.status].label}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-[200px]">
+                        {fixture.score && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {fixture.score}
+                          </p>
+                        )}
+                        {fixture.result && (
+                          <p className="text-xs font-medium text-green-600 dark:text-green-400 truncate flex items-center gap-1">
+                            <Trophy className="h-3 w-3 shrink-0" />
+                            {fixture.result}
+                          </p>
+                        )}
+                        {!fixture.score && !fixture.result && (
+                          <p className="text-xs text-muted-foreground italic">
+                            Not started
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(fixture)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openScoreDialog(fixture)}>
+                            <ClipboardEdit className="h-4 w-4 mr-2" />
+                            Update Score
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 dark:text-red-400"
+                            onClick={() => handleDelete(fixture)}
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Mobile/Tablet Cards (md-lg) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:hidden">
-        {paginatedFixtures.map((fixture) => (
-          <Card key={fixture.id} className="border-border/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-muted-foreground">
-                  Match #{fixture.matchNumber}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {fixture.status === "live" && (
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+      {filteredFixtures.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:hidden">
+          {paginatedFixtures.map((fixture) => (
+            <Card key={fixture.id} className="border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    Match #{fixture.matchNumber}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {fixture.status === "live" && (
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                      </span>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={statusConfig[fixture.status].className}
+                    >
+                      {statusConfig[fixture.status].label}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Teams */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex-1 flex items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                      style={{ backgroundColor: fixture.team1Color }}
+                    >
+                      {fixture.team1Short}
+                    </div>
+                    <span className="font-semibold text-sm text-foreground truncate">
+                      {fixture.team1}
                     </span>
-                  )}
-                  <Badge
-                    variant="outline"
-                    className={statusConfig[fixture.status].className}
-                  >
-                    {statusConfig[fixture.status].label}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Teams */}
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex-1 flex items-center gap-2">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                    style={{ backgroundColor: fixture.team1Color }}
-                  >
-                    {fixture.team1Short}
                   </div>
-                  <span className="font-semibold text-sm text-foreground truncate">
-                    {fixture.team1}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground font-bold shrink-0">VS</span>
-                <div className="flex-1 flex items-center gap-2 justify-end">
-                  <span className="font-semibold text-sm text-foreground truncate text-right">
-                    {fixture.team2}
-                  </span>
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                    style={{ backgroundColor: fixture.team2Color }}
-                  >
-                    {fixture.team2Short}
+                  <span className="text-xs text-muted-foreground font-bold shrink-0">VS</span>
+                  <div className="flex-1 flex items-center gap-2 justify-end">
+                    <span className="font-semibold text-sm text-foreground truncate text-right">
+                      {fixture.team2}
+                    </span>
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                      style={{ backgroundColor: fixture.team2Color }}
+                    >
+                      {fixture.team2Short}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Details */}
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {fixture.date}
-                </span>
-                <span>{fixture.time}</span>
-              </div>
-
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
-                <MapPin className="h-3 w-3 shrink-0" />
-                {fixture.venue}
-              </div>
-
-              {/* Score/Result */}
-              {fixture.score && (
-                <div className="bg-muted/50 rounded-lg p-2 mb-3">
-                  <p className="text-xs text-muted-foreground">{fixture.score}</p>
-                  {fixture.result && (
-                    <p className="text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-1 mt-1">
-                      <Trophy className="h-3 w-3" />
-                      {fixture.result}
-                    </p>
-                  )}
+                {/* Details */}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {fixture.date}
+                  </span>
+                  <span>{fixture.time}</span>
                 </div>
-              )}
 
-              {/* Actions */}
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditDialog(fixture)}
-                >
-                  <Pencil className="h-3.5 w-3.5 mr-1" />
-                  Edit
-                </Button>
-                {fixture.status !== "upcoming" && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  {fixture.venue}
+                </div>
+
+                {/* Score/Result */}
+                {fixture.score && (
+                  <div className="bg-muted/50 rounded-lg p-2 mb-3">
+                    <p className="text-xs text-muted-foreground">{fixture.score}</p>
+                    {fixture.result && (
+                      <p className="text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-1 mt-1">
+                        <Trophy className="h-3 w-3" />
+                        {fixture.result}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 justify-end">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => openScoreDialog(fixture)}
+                    onClick={() => openEditDialog(fixture)}
                   >
-                    <ClipboardEdit className="h-3.5 w-3.5 mr-1" />
-                    Score
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    Edit
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Delete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  {fixture.status !== "upcoming" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openScoreDialog(fixture)}
+                    >
+                      <ClipboardEdit className="h-3.5 w-3.5 mr-1" />
+                      Score
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                    onClick={() => handleDelete(fixture)}
+                    disabled={isSubmitting}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -535,7 +825,7 @@ export default function FixturesManagementPage() {
       )}
 
       {/* Add/Edit Fixture Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) setDialogOpen(false); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -552,9 +842,9 @@ export default function FixturesManagementPage() {
               <div className="grid gap-2">
                 <Label htmlFor="fixture-team1">Team 1</Label>
                 <Select
-                  value={formData.team1}
+                  value={formData.team1Id}
                   onValueChange={(val) =>
-                    setFormData({ ...formData, team1: val })
+                    setFormData({ ...formData, team1Id: val })
                   }
                 >
                   <SelectTrigger className="w-full">
@@ -562,8 +852,9 @@ export default function FixturesManagementPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.name}>
-                        {team.logo} {team.name}
+                      <SelectItem key={team.id} value={team.id}>
+                        <span className="mr-1.5">{team.logo}</span>
+                        {team.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -572,9 +863,9 @@ export default function FixturesManagementPage() {
               <div className="grid gap-2">
                 <Label htmlFor="fixture-team2">Team 2</Label>
                 <Select
-                  value={formData.team2}
+                  value={formData.team2Id}
                   onValueChange={(val) =>
-                    setFormData({ ...formData, team2: val })
+                    setFormData({ ...formData, team2Id: val })
                   }
                 >
                   <SelectTrigger className="w-full">
@@ -582,8 +873,9 @@ export default function FixturesManagementPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.name}>
-                        {team.logo} {team.name}
+                      <SelectItem key={team.id} value={team.id}>
+                        <span className="mr-1.5">{team.logo}</span>
+                        {team.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -630,7 +922,7 @@ export default function FixturesManagementPage() {
               <Select
                 value={formData.status}
                 onValueChange={(val) =>
-                  setFormData({ ...formData, status: val as Fixture["status"] })
+                  setFormData({ ...formData, status: val })
                 }
               >
                 <SelectTrigger className="w-full">
@@ -645,10 +937,11 @@ export default function FixturesManagementPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={() => setDialogOpen(false)}>
+            <Button onClick={handleSaveFixture} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingFixture ? "Save Changes" : "Schedule Match"}
             </Button>
           </DialogFooter>
@@ -656,7 +949,7 @@ export default function FixturesManagementPage() {
       </Dialog>
 
       {/* Update Score Dialog */}
-      <Dialog open={scoreDialogOpen} onOpenChange={setScoreDialogOpen}>
+      <Dialog open={scoreDialogOpen} onOpenChange={(open) => { if (!open) setScoreDialogOpen(false); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Score</DialogTitle>
@@ -694,10 +987,12 @@ export default function FixturesManagementPage() {
             <Button
               variant="outline"
               onClick={() => setScoreDialogOpen(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button onClick={() => setScoreDialogOpen(false)}>
+            <Button onClick={handleUpdateScore} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Update Score
             </Button>
           </DialogFooter>

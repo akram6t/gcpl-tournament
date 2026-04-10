@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { teams, tournamentInfo } from "@/lib/cricket-data";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import { apiGet, apiPut } from "@/lib/api";
+import { tournamentInfo } from "@/lib/cricket-data";
 import { Team } from "@/lib/cricket-data";
 import { StatsCard } from "@/components/admin/stats-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +41,8 @@ import {
   Swords,
   Info,
   CheckCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 interface ExtendedTeam extends Team {
@@ -64,41 +68,150 @@ function generateForm(team: Team): ExtendedTeam["form"] {
   return form;
 }
 
-const sortedTeams = [...teams]
-  .sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    const aNrr = parseFloat(a.nrr);
-    const bNrr = parseFloat(b.nrr);
-    return bNrr - aNrr;
-  })
-  .map((t) => ({ ...t, form: generateForm(t) }));
-
-const totalMatches = tournamentInfo.totalMatches;
-const totalPlayed = sortedTeams.reduce((sum, t) => sum + t.matchesPlayed, 0) / 2;
-const remaining = totalMatches - totalPlayed;
-
 export default function StandingsPage() {
+  const [teams, setTeams] = useState<ExtendedTeam[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<ExtendedTeam | null>(null);
   const [editNrr, setEditNrr] = useState("");
   const [editPoints, setEditPoints] = useState("");
+  const [editWins, setEditWins] = useState("");
+  const [editLosses, setEditLosses] = useState("");
+  const [editDraws, setEditDraws] = useState("");
+  const [editMatchesPlayed, setEditMatchesPlayed] = useState("");
 
-  const leader = sortedTeams[0];
-  // Find closest race - teams with smallest points difference adjacent to each other
+  const fetchStandings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await apiGet<Team[]>("/api/standings");
+      const extended: ExtendedTeam[] = data.map((t) => ({
+        ...t,
+        form: generateForm(t),
+      }));
+      setTeams(extended);
+    } catch (error) {
+      console.error("Failed to fetch standings:", error);
+      toast.error("Failed to load standings. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStandings();
+  }, [fetchStandings]);
+
+  const leader = teams[0];
+
+  // Find closest race
   let closestRace = "";
-  for (let i = 0; i < sortedTeams.length - 1; i++) {
-    const diff = sortedTeams[i].points - sortedTeams[i + 1].points;
+  for (let i = 0; i < teams.length - 1; i++) {
+    const diff = teams[i].points - teams[i + 1].points;
     if (diff <= 1) {
-      closestRace = `${sortedTeams[i].shortName} vs ${sortedTeams[i + 1].shortName}`;
+      closestRace = `${teams[i].shortName} vs ${teams[i + 1].shortName}`;
       break;
     }
   }
+
+  const totalMatches = tournamentInfo.totalMatches;
+  const totalPlayed = teams.length > 0
+    ? teams.reduce((sum, t) => sum + t.matchesPlayed, 0) / 2
+    : 0;
+  const remaining = totalMatches - totalPlayed;
 
   const openEditDialog = (team: ExtendedTeam) => {
     setEditingTeam(team);
     setEditNrr(team.nrr);
     setEditPoints(String(team.points));
+    setEditWins(String(team.wins));
+    setEditLosses(String(team.losses));
+    setEditDraws(String(team.draws));
+    setEditMatchesPlayed(String(team.matchesPlayed));
     setEditDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editingTeam) return;
+
+    const points = parseInt(editPoints, 10);
+    const wins = parseInt(editWins, 10);
+    const losses = parseInt(editLosses, 10);
+    const draws = parseInt(editDraws, 10);
+    const matchesPlayed = parseInt(editMatchesPlayed, 10);
+
+    if (isNaN(points) || isNaN(wins) || isNaN(losses) || isNaN(draws) || isNaN(matchesPlayed)) {
+      toast.error("Please enter valid numbers for all fields.");
+      return;
+    }
+
+    if (editNrr === "") {
+      toast.error("Please enter a valid NRR value.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const updated = await apiPut<Team>("/api/standings", {
+        id: editingTeam.id,
+        points,
+        nrr: editNrr,
+        wins,
+        losses,
+        draws,
+        matchesPlayed,
+      });
+
+      // Update local state with the returned team
+      setTeams((prev) => {
+        const updatedTeams = prev.map((t) =>
+          t.id === updated.id ? { ...updated, form: generateForm(updated) } : t
+        );
+        // Re-sort by points desc, nrr desc
+        return updatedTeams.sort((a, b) => {
+          if (b.points !== a.points) return b.points - a.points;
+          const aNrr = parseFloat(a.nrr);
+          const bNrr = parseFloat(b.nrr);
+          return bNrr - aNrr;
+        });
+      });
+
+      setEditDialogOpen(false);
+      toast.success(`${editingTeam.name} standings updated successfully!`);
+    } catch (error) {
+      console.error("Failed to save standings:", error);
+      toast.error("Failed to save standings. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (teams.length === 0) return;
+
+    const headers = ["Pos", "Team", "Short", "M", "W", "L", "D", "NRR", "Pts", "Captain"];
+    const rows = teams.map((t, idx) => [
+      idx + 1,
+      `"${t.name}"`,
+      t.shortName,
+      t.matchesPlayed,
+      t.wins,
+      t.losses,
+      t.draws,
+      t.nrr,
+      t.points,
+      `"${t.captain}"`,
+    ]);
+
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gcpl-standings.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Standings exported to CSV!");
   };
 
   const getNrrColor = (nrr: string) => {
@@ -135,6 +248,95 @@ export default function StandingsPage() {
     return <span className="text-sm font-medium text-muted-foreground">{pos}</span>;
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div>
+            <div className="h-6 w-36 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-64 bg-muted animate-pulse rounded mt-2" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-28 bg-muted animate-pulse rounded" />
+            <div className="h-9 w-32 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+
+        {/* Alert skeleton */}
+        <div className="h-12 bg-muted animate-pulse rounded-lg" />
+
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border-border/50">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+                    <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+                  </div>
+                  <div className="w-11 h-11 bg-muted animate-pulse rounded-xl" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Table skeleton */}
+        <Card className="border-border/50 hidden md:block">
+          <CardContent className="p-0">
+            <div className="px-4 py-3 border-b">
+              <div className="flex gap-4">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="h-4 bg-muted animate-pulse rounded flex-1" />
+                ))}
+              </div>
+            </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex gap-4 px-4 py-3 border-b last:border-0">
+                {Array.from({ length: 10 }).map((_, j) => (
+                  <div key={j} className="h-4 bg-muted animate-pulse rounded flex-1" />
+                ))}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Mobile cards skeleton */}
+        <div className="grid grid-cols-1 gap-3 md:hidden">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Card key={i} className="border-border/50">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-muted animate-pulse rounded" />
+                    <div className="w-8 h-8 bg-muted animate-pulse rounded-full" />
+                    <div className="space-y-1">
+                      <div className="h-4 w-28 bg-muted animate-pulse rounded" />
+                      <div className="h-3 w-20 bg-muted animate-pulse rounded" />
+                    </div>
+                  </div>
+                  <div className="w-20 h-6 bg-muted animate-pulse rounded" />
+                </div>
+                <div className="grid grid-cols-6 gap-2">
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <div key={j} className="space-y-1 text-center">
+                      <div className="h-3 w-6 bg-muted animate-pulse rounded mx-auto" />
+                      <div className="h-4 w-6 bg-muted animate-pulse rounded mx-auto" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Actions */}
@@ -144,9 +346,13 @@ export default function StandingsPage() {
           <p className="text-sm text-muted-foreground">Manage league standings and qualification</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
             <Download className="w-4 h-4" />
             Export CSV
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={fetchStandings}>
+            <RefreshCw className="w-4 h-4" />
+            Refresh
           </Button>
           <Button variant="destructive" className="gap-2">
             <RotateCcw className="w-4 h-4" />
@@ -183,9 +389,9 @@ export default function StandingsPage() {
         />
         <StatsCard
           title="Leader"
-          value={leader.shortName}
+          value={leader ? leader.shortName : "—"}
           icon={Trophy}
-          description={leader.name}
+          description={leader ? leader.name : "No data"}
           iconColor="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-100 dark:bg-amber-500/15"
         />
@@ -218,7 +424,7 @@ export default function StandingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedTeams.map((team, idx) => {
+              {teams.map((team, idx) => {
                 const pos = idx + 1;
                 const isQualified = pos <= 4;
                 return (
@@ -307,7 +513,7 @@ export default function StandingsPage() {
 
       {/* Mobile Cards */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
-        {sortedTeams.map((team, idx) => {
+        {teams.map((team, idx) => {
           const pos = idx + 1;
           const isQualified = pos <= 4;
           return (
@@ -444,7 +650,7 @@ export default function StandingsPage() {
             <DialogTitle>Edit Team Standings</DialogTitle>
             <DialogDescription>
               {editingTeam
-                ? `Update NRR and Points for ${editingTeam.name}`
+                ? `Update standings for ${editingTeam.name}`
                 : "Edit team standings."}
             </DialogDescription>
           </DialogHeader>
@@ -460,11 +666,70 @@ export default function StandingsPage() {
                 <div>
                   <p className="font-semibold text-foreground">{editingTeam.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    Captain: {editingTeam.captain} &bull; M: {editingTeam.matchesPlayed} &bull; W: {editingTeam.wins} &bull; L: {editingTeam.losses}
+                    Captain: {editingTeam.captain}
                   </p>
                 </div>
               </div>
             )}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-matches">Matches</Label>
+                <Input
+                  id="edit-matches"
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 6"
+                  value={editMatchesPlayed}
+                  onChange={(e) => setEditMatchesPlayed(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-wins">Wins</Label>
+                <Input
+                  id="edit-wins"
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 5"
+                  value={editWins}
+                  onChange={(e) => setEditWins(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-losses">Losses</Label>
+                <Input
+                  id="edit-losses"
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 1"
+                  value={editLosses}
+                  onChange={(e) => setEditLosses(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-draws">Draws</Label>
+                <Input
+                  id="edit-draws"
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 0"
+                  value={editDraws}
+                  onChange={(e) => setEditDraws(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-points">Points</Label>
+                <Input
+                  id="edit-points"
+                  type="number"
+                  min="0"
+                  placeholder="e.g., 10"
+                  value={editPoints}
+                  onChange={(e) => setEditPoints(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-nrr">Net Run Rate (NRR)</Label>
               <Input
@@ -474,23 +739,20 @@ export default function StandingsPage() {
                 onChange={(e) => setEditNrr(e.target.value)}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-points">Points</Label>
-              <Input
-                id="edit-points"
-                type="number"
-                placeholder="e.g., 10"
-                value={editPoints}
-                onChange={(e) => setEditPoints(e.target.value)}
-              />
-            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={() => setEditDialogOpen(false)}>
-              Save Changes
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
