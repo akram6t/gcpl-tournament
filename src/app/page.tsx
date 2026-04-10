@@ -13,6 +13,7 @@ import {
   UserCog,
   Menu,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { HeroSection } from "@/components/cricket/hero-section";
 import { TeamsSection } from "@/components/cricket/teams-section";
@@ -23,6 +24,7 @@ import { GallerySection } from "@/components/cricket/gallery-section";
 import { RolesSection } from "@/components/cricket/roles-section";
 import { Footer } from "@/components/cricket/footer";
 import { ThemeToggle } from "@/components/theme-toggle";
+import Link from "next/link";
 import { liveMatchData } from "@/lib/cricket-data";
 
 const tabs = [
@@ -87,6 +89,10 @@ export default function HomePage() {
                   ))}
                 </TabsList>
               </Tabs>
+              <Link href="/admin" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Admin
+              </Link>
               <ThemeToggle />
             </nav>
 
@@ -129,7 +135,7 @@ export default function HomePage() {
                 </div>
               </div>
               <nav className="px-4 pb-3">
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {tabs.map((tab) => (
                     <button
                       key={tab.value}
@@ -148,6 +154,10 @@ export default function HomePage() {
                     </button>
                   ))}
                 </div>
+                <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-1 p-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-all mt-1">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="text-xs">Admin</span>
+                </Link>
               </nav>
             </motion.div>
           )}
