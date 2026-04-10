@@ -1,16 +1,40 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin, Calendar, Users, IndianRupee, Zap,
-  ChevronRight, Play, Star,
+  ChevronRight, Play, Star, RefreshCw,
 } from "lucide-react";
-import { tournamentInfo, teams, liveMatchData, recentResults } from "@/lib/cricket-data";
+import { tournamentInfo, fetchTeams, liveMatchData, recentResults, type Team } from "@/lib/cricket-data";
 
 export function HeroSection() {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadTeams = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchTeams();
+      setTeams(data);
+    } catch {
+      setError("Failed to load standings.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeams();
+  }, []);
+
   const topTeam = teams[0];
+  const sortedTeams = [...teams].sort((a, b) => b.points - a.points).slice(0, 3);
 
   return (
     <div className="relative overflow-hidden">
@@ -158,28 +182,61 @@ export function HeroSection() {
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Star className="w-4 h-4 text-yellow-500" /> Table Toppers
             </h2>
-            <div className="text-center mb-4">
-              <div className="text-4xl mb-2">{topTeam.logo}</div>
-              <h3 className="text-lg font-bold">{topTeam.name}</h3>
-              <p className="text-2xl font-extrabold text-green-600 dark:text-green-400">{topTeam.points} pts</p>
-              <p className="text-xs text-muted-foreground">NRR: {topTeam.nrr}</p>
-            </div>
-            <div className="space-y-2">
-              {teams.slice(0, 3).map((team, i) => (
-                <div key={team.id} className="flex items-center gap-3 p-2 rounded-lg inner-card">
-                  <span className={`text-lg font-bold w-6 text-center ${i === 0 ? "text-yellow-500" : i === 1 ? "text-gray-400" : "text-orange-500"}`}>{i + 1}</span>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: team.color }}>{team.shortName}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{team.name}</p>
-                    <p className="text-xs text-muted-foreground">{team.wins}W / {team.losses}L</p>
-                  </div>
-                  <span className="text-sm font-bold text-green-600 dark:text-green-400">{team.points}</span>
+
+            {loading && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <Skeleton className="w-16 h-16 rounded-full mx-auto mb-2" />
+                  <Skeleton className="h-5 w-32 mx-auto mb-1" />
+                  <Skeleton className="h-7 w-16 mx-auto mb-1" />
+                  <Skeleton className="h-3 w-20 mx-auto" />
                 </div>
-              ))}
-            </div>
-            <Button variant="ghost" className="w-full mt-3 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-500/10 text-sm">
-              View Full Table <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2">
+                    <Skeleton className="w-6 h-5" />
+                    <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+                    <div className="flex-1"><Skeleton className="h-4 w-24 mb-1" /><Skeleton className="h-3 w-16" /></div>
+                    <Skeleton className="w-6 h-4" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!loading && error && (
+              <div className="text-center py-4">
+                <p className="text-destructive text-sm mb-2">{error}</p>
+                <Button variant="ghost" size="sm" onClick={loadTeams}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Retry
+                </Button>
+              </div>
+            )}
+
+            {!loading && !error && topTeam && (
+              <>
+                <div className="text-center mb-4">
+                  <div className="text-4xl mb-2">{topTeam.logo}</div>
+                  <h3 className="text-lg font-bold">{topTeam.name}</h3>
+                  <p className="text-2xl font-extrabold text-green-600 dark:text-green-400">{topTeam.points} pts</p>
+                  <p className="text-xs text-muted-foreground">NRR: {topTeam.nrr}</p>
+                </div>
+                <div className="space-y-2">
+                  {sortedTeams.map((team, i) => (
+                    <div key={team.id} className="flex items-center gap-3 p-2 rounded-lg inner-card">
+                      <span className={`text-lg font-bold w-6 text-center ${i === 0 ? "text-yellow-500" : i === 1 ? "text-gray-400" : "text-orange-500"}`}>{i + 1}</span>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: team.color }}>{team.shortName}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{team.name}</p>
+                        <p className="text-xs text-muted-foreground">{team.wins}W / {team.losses}L</p>
+                      </div>
+                      <span className="text-sm font-bold text-green-600 dark:text-green-400">{team.points}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="ghost" className="w-full mt-3 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-500/10 text-sm">
+                  View Full Table <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </>
+            )}
           </motion.div>
         </div>
       </div>

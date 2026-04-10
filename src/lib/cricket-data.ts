@@ -1,3 +1,5 @@
+// ============ Interfaces ============
+
 export interface Team {
   id: string;
   name: string;
@@ -52,6 +54,7 @@ export interface GalleryImage {
   id: string;
   title: string;
   category: string;
+  imageUrl?: string;
 }
 
 export interface TournamentRole {
@@ -62,6 +65,8 @@ export interface TournamentRole {
   responsibilities: string[];
   color: string;
 }
+
+// ============ Static Data (no API equivalent) ============
 
 export const tournamentInfo = {
   name: "Gully Cricket Premier League",
@@ -82,6 +87,132 @@ export const tournamentInfo = {
   organizer: "Mumbai Gully Cricket Association",
 };
 
+export const tournamentRoles: TournamentRole[] = [
+  {
+    id: "1",
+    name: "Tournament Organizer",
+    icon: "crown",
+    description: "The mastermind behind the tournament. Handles scheduling, venue booking, dispute resolution, and overall management.",
+    responsibilities: [
+      "Schedule & manage all matches",
+      "Book venues & arrange equipment",
+      "Handle disputes & rule enforcement",
+      "Manage prize distribution",
+      "Coordinate with sponsors",
+    ],
+    color: "#eab308",
+  },
+  {
+    id: "2",
+    name: "Team Captain",
+    icon: "shield",
+    description: "Leads the team on and off the field. Responsible for team selection, strategy, and player motivation.",
+    responsibilities: [
+      "Select playing XI for each match",
+      "Make bowling & batting changes",
+      "Motivate & lead the team",
+      "Represent team in toss",
+      "Handle team communications",
+    ],
+    color: "#ef4444",
+  },
+  {
+    id: "3",
+    name: "Player",
+    icon: "user",
+    description: "The heart of gully cricket. Players bring their passion, skills, and love for the game to every match.",
+    responsibilities: [
+      "Give 100% on the field",
+      "Maintain sportsmanship",
+      "Follow tournament rules",
+      "Support teammates",
+      "Respect umpire decisions",
+    ],
+    color: "#22c55e",
+  },
+  {
+    id: "4",
+    name: "Umpire",
+    icon: "eye",
+    description: "The guardian of fair play. Makes crucial decisions and ensures the game is played in the right spirit.",
+    responsibilities: [
+      "Make fair & unbiased decisions",
+      "Enforce tournament rules",
+      "Count & verify deliveries",
+      "Handle LBW & wide decisions",
+      "Report any misconduct",
+    ],
+    color: "#f97316",
+  },
+  {
+    id: "5",
+    name: "Scorer",
+    icon: "clipboard",
+    description: "Keeps track of every ball, run, and wicket. The unsung hero who ensures accurate records.",
+    responsibilities: [
+      "Record ball-by-ball scores",
+      "Track run rates & stats",
+      "Calculate over counts",
+      "Maintain scorecards",
+      "Update digital scoreboard",
+    ],
+    color: "#06b6d4",
+  },
+  {
+    id: "6",
+    name: "Spectator / Fan",
+    icon: "heart",
+    description: "The energy of gully cricket! Fans bring the noise, the cheers, and the unforgettable atmosphere.",
+    responsibilities: [
+      "Cheer for your favorite team",
+      "Maintain crowd discipline",
+      "Respect all teams & players",
+      "Share on social media",
+      "Enjoy the gully cricket spirit!",
+    ],
+    color: "#ec4899",
+  },
+];
+
+export const liveMatchData = {
+  matchNumber: 18,
+  team1: {
+    name: "Andheri Avengers",
+    short: "AA",
+    color: "#22c55e",
+    score: "45/2",
+    overs: "4.2",
+    runRate: "10.59",
+  },
+  team2: {
+    name: "Worli Warriors",
+    short: "WW",
+    color: "#a855f7",
+    score: "Yet to bat",
+    overs: "0",
+    runRate: "-",
+  },
+  batsmen: [
+    { name: "Vikram Patel", runs: 22, balls: 15, fours: 3, sixes: 1, isOnStrike: true },
+    { name: "Rajesh Naik", runs: 12, balls: 9, fours: 2, sixes: 0, isOnStrike: false },
+  ],
+  bowler: { name: "Deepak Singh", overs: "1.2", maidens: 0, runs: 18, wickets: 1, economy: "12.86" },
+  lastOver: ["1", "4", "W", "0", "2", "6"],
+  currentOver: ["1", ".", "4"],
+  target: "83",
+};
+
+export const recentResults = [
+  { team1: "Dadar Dynamos", team1Short: "DD", team2: "Thane Tigers", team2Short: "TT", result: "DD won by 46 runs", margin: "46 runs" },
+  { team1: "Juhu Jaguars", team1Short: "JJ", team2: "Kurla Knights", team2Short: "KK", result: "KK won by 5 wickets", margin: "5 wickets" },
+  { team1: "Bandra Blazers", team1Short: "BB", team2: "Thane Tigers", team2Short: "TT", result: "BB won by 49 runs", margin: "49 runs" },
+  { team1: "Andheri Avengers", team1Short: "AA", team2: "Powai Panthers", team2Short: "PP", result: "AA won by 18 runs", margin: "18 runs" },
+  { team1: "Dadar Dynamos", team1Short: "DD", team2: "Worli Warriors", team2Short: "WW", result: "DD won by 4 runs", margin: "4 runs" },
+];
+
+// ============ Static Data (kept for backward compatibility with admin pages) ============
+
+/** @deprecated Use fetchTeams() for live data from API */
 export const teams: Team[] = [
   {
     id: "1",
@@ -205,6 +336,7 @@ export const teams: Team[] = [
   },
 ];
 
+/** @deprecated Use fetchFixtures() for live data from API */
 export const fixtures: Fixture[] = [
   {
     id: "1",
@@ -492,7 +624,6 @@ export const fixtures: Fixture[] = [
     venue: "Shivaji Park Ground A",
     status: "live",
     score: "AA 45/2 (4.2 ov) vs WW -",
-    result: undefined,
   },
   {
     id: "19",
@@ -580,6 +711,7 @@ export const fixtures: Fixture[] = [
   },
 ];
 
+/** @deprecated Use fetchPlayers() for live data from API */
 export const topPlayers: Player[] = [
   {
     id: "1",
@@ -739,6 +871,7 @@ export const topPlayers: Player[] = [
   },
 ];
 
+/** @deprecated Use fetchGallery() for live data from API */
 export const galleryImages: GalleryImage[] = [
   { id: "1", title: "Opening Ceremony - GCPL Season 4", category: "Events" },
   { id: "2", title: "Rahul Sharma's Century Celebration", category: "Highlights" },
@@ -754,125 +887,206 @@ export const galleryImages: GalleryImage[] = [
   { id: "12", title: "Kids Playing at the Side Nets", category: "Fans" },
 ];
 
-export const tournamentRoles: TournamentRole[] = [
-  {
-    id: "1",
-    name: "Tournament Organizer",
-    icon: "crown",
-    description: "The mastermind behind the tournament. Handles scheduling, venue booking, dispute resolution, and overall management.",
-    responsibilities: [
-      "Schedule & manage all matches",
-      "Book venues & arrange equipment",
-      "Handle disputes & rule enforcement",
-      "Manage prize distribution",
-      "Coordinate with sponsors",
-    ],
-    color: "#eab308",
-  },
-  {
-    id: "2",
-    name: "Team Captain",
-    icon: "shield",
-    description: "Leads the team on and off the field. Responsible for team selection, strategy, and player motivation.",
-    responsibilities: [
-      "Select playing XI for each match",
-      "Make bowling & batting changes",
-      "Motivate & lead the team",
-      "Represent team in toss",
-      "Handle team communications",
-    ],
-    color: "#ef4444",
-  },
-  {
-    id: "3",
-    name: "Player",
-    icon: "user",
-    description: "The heart of gully cricket. Players bring their passion, skills, and love for the game to every match.",
-    responsibilities: [
-      "Give 100% on the field",
-      "Maintain sportsmanship",
-      "Follow tournament rules",
-      "Support teammates",
-      "Respect umpire decisions",
-    ],
-    color: "#22c55e",
-  },
-  {
-    id: "4",
-    name: "Umpire",
-    icon: "eye",
-    description: "The guardian of fair play. Makes crucial decisions and ensures the game is played in the right spirit.",
-    responsibilities: [
-      "Make fair & unbiased decisions",
-      "Enforce tournament rules",
-      "Count & verify deliveries",
-      "Handle LBW & wide decisions",
-      "Report any misconduct",
-    ],
-    color: "#f97316",
-  },
-  {
-    id: "5",
-    name: "Scorer",
-    icon: "clipboard",
-    description: "Keeps track of every ball, run, and wicket. The unsung hero who ensures accurate records.",
-    responsibilities: [
-      "Record ball-by-ball scores",
-      "Track run rates & stats",
-      "Calculate over counts",
-      "Maintain scorecards",
-      "Update digital scoreboard",
-    ],
-    color: "#06b6d4",
-  },
-  {
-    id: "6",
-    name: "Spectator / Fan",
-    icon: "heart",
-    description: "The energy of gully cricket! Fans bring the noise, the cheers, and the unforgettable atmosphere.",
-    responsibilities: [
-      "Cheer for your favorite team",
-      "Maintain crowd discipline",
-      "Respect all teams & players",
-      "Share on social media",
-      "Enjoy the gully cricket spirit!",
-    ],
-    color: "#ec4899",
-  },
-];
+// ============ API Types (raw backend responses) ============
 
-export const liveMatchData = {
-  matchNumber: 18,
-  team1: {
-    name: "Andheri Avengers",
-    short: "AA",
-    color: "#22c55e",
-    score: "45/2",
-    overs: "4.2",
-    runRate: "10.59",
-  },
-  team2: {
-    name: "Worli Warriors",
-    short: "WW",
-    color: "#a855f7",
-    score: "Yet to bat",
-    overs: "0",
-    runRate: "-",
-  },
-  batsmen: [
-    { name: "Vikram Patel", runs: 22, balls: 15, fours: 3, sixes: 1, isOnStrike: true },
-    { name: "Rajesh Naik", runs: 12, balls: 9, fours: 2, sixes: 0, isOnStrike: false },
-  ],
-  bowler: { name: "Deepak Singh", overs: "1.2", maidens: 0, runs: 18, wickets: 1, economy: "12.86" },
-  lastOver: ["1", "4", "W", "0", "2", "6"],
-  currentOver: ["1", ".", "4"],
-  target: "83",
-};
+interface ApiTeam {
+  id: string;
+  name: string;
+  shortName: string;
+  color: string;
+  colorLight: string;
+  captain: string;
+  logo: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+  nrr: string;
+  matchesPlayed: number;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { players: number };
+}
 
-export const recentResults = [
-  { team1: "Dadar Dynamos", team1Short: "DD", team2: "Thane Tigers", team2Short: "TT", result: "DD won by 46 runs", margin: "46 runs" },
-  { team1: "Juhu Jaguars", team1Short: "JJ", team2: "Kurla Knights", team2Short: "KK", result: "KK won by 5 wickets", margin: "5 wickets" },
-  { team1: "Bandra Blazers", team1Short: "BB", team2: "Thane Tigers", team2Short: "TT", result: "BB won by 49 runs", margin: "49 runs" },
-  { team1: "Andheri Avengers", team1Short: "AA", team2: "Powai Panthers", team2Short: "PP", result: "AA won by 18 runs", margin: "18 runs" },
-  { team1: "Dadar Dynamos", team1Short: "DD", team2: "Worli Warriors", team2Short: "WW", result: "DD won by 4 runs", margin: "4 runs" },
-];
+interface ApiPlayer {
+  id: string;
+  name: string;
+  team: string;
+  teamShort: string;
+  teamColor: string;
+  teamId: string;
+  role: string;
+  matches: number;
+  runs: number;
+  wickets: number;
+  avg: string | number;
+  sr: string | number;
+  bestBatting: string;
+  bestBowling: string;
+  isCaptain: boolean;
+}
+
+interface ApiFixture {
+  id: string;
+  matchNumber: number;
+  team1: string;
+  team1Short: string;
+  team1Color: string;
+  team2: string;
+  team2Short: string;
+  team2Color: string;
+  date: string;
+  time: string;
+  venue: string;
+  status: string;
+  score?: string;
+  result?: string;
+}
+
+interface ApiGalleryImage {
+  id: string;
+  title: string;
+  category: string;
+  imageUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============ Fetcher Functions ============
+
+export async function fetchTeams(): Promise<Team[]> {
+  try {
+    const res = await fetch("/api/teams");
+    if (!res.ok) throw new Error("Failed to fetch teams");
+    const data: ApiTeam[] = await res.json();
+    return data.map((t) => ({
+      id: t.id,
+      name: t.name,
+      shortName: t.shortName,
+      color: t.color,
+      colorLight: t.colorLight,
+      captain: t.captain,
+      logo: t.logo,
+      wins: t.wins ?? 0,
+      losses: t.losses ?? 0,
+      draws: t.draws ?? 0,
+      points: t.points ?? 0,
+      nrr: t.nrr ?? "0.000",
+      matchesPlayed: t.matchesPlayed ?? 0,
+    }));
+  } catch (error) {
+    console.error("Error fetching teams:", error);
+    throw error;
+  }
+}
+
+export async function fetchStandings(): Promise<Team[]> {
+  try {
+    const res = await fetch("/api/standings");
+    if (!res.ok) throw new Error("Failed to fetch standings");
+    const data: ApiTeam[] = await res.json();
+    return data.map((t) => ({
+      id: t.id,
+      name: t.name,
+      shortName: t.shortName,
+      color: t.color,
+      colorLight: t.colorLight,
+      captain: t.captain,
+      logo: t.logo,
+      wins: t.wins ?? 0,
+      losses: t.losses ?? 0,
+      draws: t.draws ?? 0,
+      points: t.points ?? 0,
+      nrr: t.nrr ?? "0.000",
+      matchesPlayed: t.matchesPlayed ?? 0,
+    }));
+  } catch (error) {
+    console.error("Error fetching standings:", error);
+    throw error;
+  }
+}
+
+export async function fetchPlayers(role?: string): Promise<Player[]> {
+  try {
+    const params = new URLSearchParams();
+    if (role && role !== "all") {
+      // Map frontend role filter to API role values
+      if (role === "batsmen") params.set("role", "Batsman");
+      else if (role === "bowlers") params.set("role", "Bowler");
+      else if (role === "allrounders") params.set("role", "All-Rounder");
+    }
+    const url = `/api/players${params.toString() ? `?${params.toString()}` : ""}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to fetch players");
+    const data: ApiPlayer[] = await res.json();
+    return data.map((p) => ({
+      id: p.id,
+      name: p.name,
+      team: p.team,
+      teamShort: p.teamShort,
+      teamColor: p.teamColor,
+      role: p.role,
+      matches: p.matches ?? 0,
+      runs: p.runs ?? 0,
+      wickets: p.wickets ?? 0,
+      avg: p.avg != null ? String(p.avg) : "0.00",
+      sr: p.sr != null ? String(p.sr) : "0.00",
+      bestBatting: p.bestBatting ?? "-",
+      bestBowling: p.bestBowling ?? "-",
+      isCaptain: p.isCaptain ?? false,
+    }));
+  } catch (error) {
+    console.error("Error fetching players:", error);
+    throw error;
+  }
+}
+
+export async function fetchFixtures(status?: string): Promise<Fixture[]> {
+  try {
+    const params = new URLSearchParams();
+    if (status && status !== "all") {
+      // Map frontend status to API status
+      params.set("status", status.toUpperCase());
+    }
+    const url = `/api/fixtures${params.toString() ? `?${params.toString()}` : ""}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to fetch fixtures");
+    const data: ApiFixture[] = await res.json();
+    return data.map((f) => ({
+      id: f.id,
+      matchNumber: f.matchNumber,
+      team1: f.team1,
+      team1Short: f.team1Short,
+      team1Color: f.team1Color,
+      team2: f.team2,
+      team2Short: f.team2Short,
+      team2Color: f.team2Color,
+      date: f.date,
+      time: f.time,
+      venue: f.venue,
+      status: (f.status?.toLowerCase() as "completed" | "live" | "upcoming") ?? "upcoming",
+      score: f.score ?? undefined,
+      result: f.result ?? undefined,
+    }));
+  } catch (error) {
+    console.error("Error fetching fixtures:", error);
+    throw error;
+  }
+}
+
+export async function fetchGallery(): Promise<GalleryImage[]> {
+  try {
+    const res = await fetch("/api/gallery");
+    if (!res.ok) throw new Error("Failed to fetch gallery");
+    const data: ApiGalleryImage[] = await res.json();
+    return data.map((g) => ({
+      id: g.id,
+      title: g.title,
+      category: g.category,
+      imageUrl: g.imageUrl ?? undefined,
+    }));
+  } catch (error) {
+    console.error("Error fetching gallery:", error);
+    throw error;
+  }
+}

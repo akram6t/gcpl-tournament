@@ -83,3 +83,40 @@ Stage Summary:
 - Fully responsive (mobile cards + collapsible sidebar)
 - Dual theme support throughout
 - All routes compile successfully
+
+---
+Task ID: 4
+Agent: Main Agent + Subagents
+Task: Build complete backend with PostgreSQL, auth, and CRUD APIs; connect frontend + admin
+
+Work Log:
+- Updated Prisma schema from SQLite to PostgreSQL with 7 models: User, Team, Player, Fixture, GalleryImage, TournamentSetting, Role enum
+- Connected to Neon PostgreSQL database (AWS ap-southeast-1)
+- Created auth system: JWT tokens (jose), bcrypt password hashing, login/signup/me API routes
+- Created CRUD API routes for all entities: /api/teams, /api/players, /api/fixtures, /api/gallery, /api/standings, /api/settings
+- All write APIs protected by role-based auth (ADMIN/ORGANIZER only)
+- Created seed script (prisma/seed.ts) with all GCPL data: 5 users, 8 teams, 10 players, 24 fixtures, 12 gallery items, 21 settings
+- Created auth store (Zustand) with login/signup/logout/checkAuth
+- Created login/signup page at /login with demo credential quick-fill buttons
+- Updated admin layout with auth protection (redirects to /login if not authenticated, blocks non-admin/organizer roles)
+- Updated admin topbar to show logged-in user info + logout button
+- Created API helper library (src/lib/api.ts) with getHeaders, apiGet, apiPost, apiPut, apiDelete
+- Updated ALL frontend components to fetch from API with loading skeletons and error handling
+- API returns data from PostgreSQL successfully (verified with curl tests)
+- All 9 page routes return HTTP 200, all API endpoints return correct data
+- ESLint passes with zero errors
+
+Stage Summary:
+- Full PostgreSQL backend on Neon with 7 tables
+- JWT auth with 4 roles: ADMIN, ORGANIZER, PLAYER, SPECTATOR
+- 6 CRUD API route groups (teams, players, fixtures, gallery, standings, settings)
+- Login page: /login with demo credentials
+- Admin panel protected by auth (redirects if not logged in)
+- Frontend fetches live data from PostgreSQL (loading skeletons, error retry)
+- Database seeded with 8 teams, 10 players, 24 fixtures, 12 gallery images
+
+Login Credentials:
+- Admin: admin@gcpl.com / admin123
+- Organizer: organizer@gcpl.com / org123
+- Player: rahul@gcpl.com / user123
+- Fan: fan@gcpl.com / user123
