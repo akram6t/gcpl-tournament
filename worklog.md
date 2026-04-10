@@ -443,3 +443,29 @@ Stage Summary:
 - Stats cards show fan engagement metrics (total, today, this week, player users)
 - Sidebar updated with "Fans" navigation link
 - Existing `/admin/players` cricket stats page preserved as-is
+
+---
+Task ID: 11
+Agent: Main Agent
+Task: Reset to last working commit and get the app running
+
+Work Log:
+- Reviewed git history: found 14 commits, identified `f4f2dd6` as the last stable commit ("GCPL - Gully Cricket Premier League Tournament App")
+- Changes after `f4f2dd6` were only server config files (Caddyfile, next.config.ts, start-dev.sh, .dev-server.sid, .zscripts/dev.pid) — no app code changes
+- Verified fans page and users API exist in `f4f2dd6` commit
+- Executed `git reset --hard f4f2dd6` to restore working state
+- Updated package.json dev script: changed `"dev": "next dev -p 3000"` to `"dev": "bun next dev -p 3000"` for better process management
+- Found that background processes kept dying between shell sessions (sandbox process cleanup)
+- Solution: Run dev server as foreground process within a single Bash session to keep shell alive
+- Server started successfully, all 12 routes verified returning HTTP 200:
+  - / (homepage), /admin (dashboard), /admin/teams, /admin/players, /admin/fans
+  - /admin/fixtures, /admin/standings, /admin/gallery, /admin/settings
+  - /api/teams, /api/players, /api/fixtures
+- Caddy proxy on port 81 also returns 200 for all routes
+- App is fully operational with PostgreSQL backend on Neon
+
+Stage Summary:
+- Reset to commit f4f2dd6 (last known working state)
+- All app code preserved: public site, admin panel, all API routes, auth system
+- App running and serving all pages successfully (HTTP 200 on all routes)
+- Dev script updated to use `bun next dev -p 3000`
