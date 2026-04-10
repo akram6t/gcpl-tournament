@@ -88,9 +88,14 @@ interface UserData {
   updatedAt: string;
 }
 
+interface CountByRoleItem {
+  role: string;
+  _count: { role: number };
+}
+
 interface UsersResponse {
   users: UserData[];
-  countByRole: { role: string; _count: number }[];
+  countByRole: CountByRoleItem[];
 }
 
 type RoleFilter = "all" | "SPECTATOR" | "PLAYER" | "ORGANIZER" | "ADMIN";
@@ -132,9 +137,7 @@ const ROLE_TAB_ICONS: Record<string, React.ReactNode> = {
 export default function FansManagementPage() {
   // Data state
   const [users, setUsers] = useState<UserData[]>([]);
-  const [countByRole, setCountByRole] = useState<
-    { role: string; _count: number }[]
-  >([]);
+  const [countByRole, setCountByRole] = useState<CountByRoleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -197,9 +200,9 @@ export default function FansManagementPage() {
     weekAgo.setDate(weekAgo.getDate() - 7);
 
     const spectatorCount =
-      countByRole.find((c) => c.role === "SPECTATOR")?._count ?? 0;
+      countByRole.find((c) => c.role === "SPECTATOR")?._count?.role ?? 0;
     const playerCount =
-      countByRole.find((c) => c.role === "PLAYER")?._count ?? 0;
+      countByRole.find((c) => c.role === "PLAYER")?._count?.role ?? 0;
     const activeToday = users.filter(
       (u) =>
         u.role === "SPECTATOR" &&
