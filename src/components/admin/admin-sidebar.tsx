@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/teams", label: "Teams", icon: Users },
   { href: "/admin/players", label: "Players", icon: PersonStanding },
+  { href: "/admin/fans", label: "Fans", icon: Heart },
   { href: "/admin/fixtures", label: "Fixtures", icon: CalendarDays },
   { href: "/admin/standings", label: "Standings", icon: Trophy },
   { href: "/admin/gallery", label: "Gallery", icon: Camera },

@@ -402,3 +402,44 @@ Stage Summary:
 - Navbar live indicator (desktop + mobile) shows/hides dynamically based on live fixture
 - Loading skeletons prevent flash of empty content
 - All existing UI, animations, and responsive design preserved
+
+---
+Task ID: 10
+Agent: Main Agent + Subagent
+Task: Create admin routes for Player and Fan user management
+
+Work Log:
+- Created `/api/users/route.ts` — Full CRUD API for user management:
+  - GET with `?role=` filter and `?search=` params, returns `{ users, countByRole }`
+  - POST creates user with name, email, password, role, phone, avatar
+  - PUT updates user fields including optional password change
+  - DELETE with `?id=` param, prevents self-deletion
+  - All endpoints protected by ADMIN/ORGANIZER auth guard
+- Created `/admin/fans/page.tsx` — Fans & Users management page:
+  - 4 stats cards: Total Fans, Active Today, New This Week, Player Users
+  - Role filter tabs: All, Spectator, Player, Organizer, Admin (server-side filtering)
+  - Client-side search by name/email
+  - Desktop table with columns: User (avatar + name + email), Role (colored badge), Phone, Joined Date, Actions
+  - Mobile card layout for responsive design
+  - Add User dialog: name, email, password, role dropdown, phone
+  - Edit User dialog: pre-filled fields, optional password change
+  - Delete confirmation AlertDialog
+  - Loading skeleton UI during data fetch
+  - Pagination (8 items per page)
+  - Role-colored avatars: ADMIN=red, ORGANIZER=amber, PLAYER=green, SPECTATOR=blue
+  - Toast notifications on all CRUD operations
+  - Empty state with "Add User" CTA
+- Updated admin sidebar (`admin-sidebar.tsx`): Added "Fans" nav item with Heart icon between Players and Fixtures
+- Updated admin layout (`layout.tsx`): Added pageMeta entry for `/admin/fans` with title "Fans & Users"
+- Existing `/admin/players` page already manages cricket player stats — kept as-is
+- ESLint passes with zero errors
+- `/admin/fans` route returns HTTP 200
+
+Stage Summary:
+- New `/api/users` CRUD API route with role filtering and search
+- New `/admin/fans` admin page for managing fan/spectator and player user accounts
+- Full CRUD: Add, Edit, Delete users with role management
+- Admin can view all users across 4 roles via filter tabs
+- Stats cards show fan engagement metrics (total, today, this week, player users)
+- Sidebar updated with "Fans" navigation link
+- Existing `/admin/players` cricket stats page preserved as-is

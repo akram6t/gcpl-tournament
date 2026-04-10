@@ -12,6 +12,7 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   "/admin": { title: "Dashboard", description: "Overview of tournament statistics and activity" },
   "/admin/teams": { title: "Teams Management", description: "Manage tournament teams, rosters, and details" },
   "/admin/players": { title: "Players Management", description: "Manage player profiles, stats, and roles" },
+  "/admin/fans": { title: "Fans & Users", description: "Manage fan accounts, player users, and roles" },
   "/admin/fixtures": { title: "Fixtures Management", description: "Schedule and manage tournament matches" },
   "/admin/standings": { title: "Standings", description: "Points table and qualification tracking" },
   "/admin/gallery": { title: "Gallery Management", description: "Manage tournament photos and media" },
