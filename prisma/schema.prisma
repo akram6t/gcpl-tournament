@@ -89,6 +89,25 @@ model Fixture {
   status      FixtureStatus @default(UPCOMING)
   score       String?
   result      String?
+  // Live score structured fields
+  battingTeam Int?       // 1 or 2 — which team is currently batting
+  team1Score  Int?       // Team 1 runs
+  team1Wickets Int?      // Team 1 wickets fallen
+  team1Overs  String?   // Team 1 overs bowled (e.g. "5.3")
+  team2Score  Int?       // Team 2 runs
+  team2Wickets Int?      // Team 2 wickets fallen
+  team2Overs  String?   // Team 2 overs bowled (e.g. "3.2")
+  striker     String?   // Current striker batsman name
+  nonStriker  String?   // Current non-striker batsman name
+  bowler      String?   // Current bowler name
+  strikerRuns Int?       // Striker individual runs
+  strikerBalls Int?      // Striker balls faced
+  nonStrikerRuns Int?    // Non-striker individual runs
+  nonStrikerBalls Int?   // Non-striker balls faced
+  bowlerRuns  Int?       // Bowler runs conceded
+  bowlerWickets Int?     // Bowler wickets taken
+  bowlerOvers String?   // Bowler overs bowled
+  thisOver    String?   // Current over ball-by-ball (e.g. "1 0 4 2")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

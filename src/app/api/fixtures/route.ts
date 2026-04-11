@@ -41,6 +41,25 @@ export async function GET(request: Request) {
       status: f.status,
       score: f.score,
       result: f.result,
+      // Live score fields
+      battingTeam: f.battingTeam,
+      team1Score: f.team1Score,
+      team1Wickets: f.team1Wickets,
+      team1Overs: f.team1Overs,
+      team2Score: f.team2Score,
+      team2Wickets: f.team2Wickets,
+      team2Overs: f.team2Overs,
+      striker: f.striker,
+      nonStriker: f.nonStriker,
+      bowler: f.bowler,
+      strikerRuns: f.strikerRuns,
+      strikerBalls: f.strikerBalls,
+      nonStrikerRuns: f.nonStrikerRuns,
+      nonStrikerBalls: f.nonStrikerBalls,
+      bowlerRuns: f.bowlerRuns,
+      bowlerWickets: f.bowlerWickets,
+      bowlerOvers: f.bowlerOvers,
+      thisOver: f.thisOver,
     }));
 
     return NextResponse.json(formatted);
@@ -110,6 +129,14 @@ export async function PUT(request: Request) {
 
     if (!id) return NextResponse.json({ error: "Fixture ID required" }, { status: 400 });
 
+    // Build score string from structured data if live score fields are present
+    let autoScore: string | null = null;
+    if (data.battingTeam && (data.team1Score != null || data.team2Score != null)) {
+      const t1 = data.team1Score != null ? `${data.team1Score}/${data.team1Wickets ?? 0} (${data.team1Overs || "0"} ov)` : "Yet to bat";
+      const t2 = data.team2Score != null ? `${data.team2Score}/${data.team2Wickets ?? 0} (${data.team2Overs || "0"} ov)` : "Yet to bat";
+      autoScore = `${t1} vs ${t2}`;
+    }
+
     const fixture = await db.fixture.update({
       where: { id },
       data: {
@@ -120,8 +147,26 @@ export async function PUT(request: Request) {
         time: data.time,
         venue: data.venue,
         status: data.status,
-        score: data.score || null,
+        score: autoScore || data.score || null,
         result: data.result || null,
+        battingTeam: data.battingTeam,
+        team1Score: data.team1Score,
+        team1Wickets: data.team1Wickets,
+        team1Overs: data.team1Overs,
+        team2Score: data.team2Score,
+        team2Wickets: data.team2Wickets,
+        team2Overs: data.team2Overs,
+        striker: data.striker,
+        nonStriker: data.nonStriker,
+        bowler: data.bowler,
+        strikerRuns: data.strikerRuns,
+        strikerBalls: data.strikerBalls,
+        nonStrikerRuns: data.nonStrikerRuns,
+        nonStrikerBalls: data.nonStrikerBalls,
+        bowlerRuns: data.bowlerRuns,
+        bowlerWickets: data.bowlerWickets,
+        bowlerOvers: data.bowlerOvers,
+        thisOver: data.thisOver,
       },
       include: {
         team1: { select: { name: true, shortName: true, color: true } },

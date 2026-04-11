@@ -48,6 +48,25 @@ export interface Fixture {
   status: "completed" | "live" | "upcoming";
   score?: string;
   result?: string;
+  // Live score structured fields
+  battingTeam?: number;
+  team1Score?: number;
+  team1Wickets?: number;
+  team1Overs?: string;
+  team2Score?: number;
+  team2Wickets?: number;
+  team2Overs?: string;
+  striker?: string;
+  nonStriker?: string;
+  bowler?: string;
+  strikerRuns?: number;
+  strikerBalls?: number;
+  nonStrikerRuns?: number;
+  nonStrikerBalls?: number;
+  bowlerRuns?: number;
+  bowlerWickets?: number;
+  bowlerOvers?: string;
+  thisOver?: string;
 }
 
 export interface GalleryImage {
@@ -941,6 +960,24 @@ interface ApiFixture {
   status: string;
   score?: string;
   result?: string;
+  battingTeam?: number;
+  team1Score?: number;
+  team1Wickets?: number;
+  team1Overs?: string;
+  team2Score?: number;
+  team2Wickets?: number;
+  team2Overs?: string;
+  striker?: string;
+  nonStriker?: string;
+  bowler?: string;
+  strikerRuns?: number;
+  strikerBalls?: number;
+  nonStrikerRuns?: number;
+  nonStrikerBalls?: number;
+  bowlerRuns?: number;
+  bowlerWickets?: number;
+  bowlerOvers?: string;
+  thisOver?: string;
 }
 
 interface ApiGalleryImage {
@@ -1067,6 +1104,24 @@ export async function fetchFixtures(status?: string): Promise<Fixture[]> {
       status: (f.status?.toLowerCase() as "completed" | "live" | "upcoming") ?? "upcoming",
       score: f.score ?? undefined,
       result: f.result ?? undefined,
+      battingTeam: f.battingTeam ?? undefined,
+      team1Score: f.team1Score ?? undefined,
+      team1Wickets: f.team1Wickets ?? undefined,
+      team1Overs: f.team1Overs ?? undefined,
+      team2Score: f.team2Score ?? undefined,
+      team2Wickets: f.team2Wickets ?? undefined,
+      team2Overs: f.team2Overs ?? undefined,
+      striker: f.striker ?? undefined,
+      nonStriker: f.nonStriker ?? undefined,
+      bowler: f.bowler ?? undefined,
+      strikerRuns: f.strikerRuns ?? undefined,
+      strikerBalls: f.strikerBalls ?? undefined,
+      nonStrikerRuns: f.nonStrikerRuns ?? undefined,
+      nonStrikerBalls: f.nonStrikerBalls ?? undefined,
+      bowlerRuns: f.bowlerRuns ?? undefined,
+      bowlerWickets: f.bowlerWickets ?? undefined,
+      bowlerOvers: f.bowlerOvers ?? undefined,
+      thisOver: f.thisOver ?? undefined,
     }));
   } catch (error) {
     console.error("Error fetching fixtures:", error);

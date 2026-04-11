@@ -508,3 +508,109 @@ Stage Summary:
 - Both public Gallery section and admin Gallery management page display photos
 - prisma/seed.ts updated with imageUrl for future deployments
 - Database seeded: 12/12 items with image URLs confirmed
+
+---
+Task ID: 4 (Live Score Control + Hero Section Update)
+Agent: Main Agent
+Task: Build Live Score Control Dialog in Admin + Update Hero Section
+
+Work Log:
+- Read existing files: admin/fixtures/page.tsx, hero-section.tsx, api.ts, cricket-data.ts, prisma/schema.prisma, /api/fixtures route.ts
+- Verified Prisma schema already has all 20+ live score structured fields on the Fixture model
+- Verified /api/fixtures GET returns all live score fields and PUT accepts them (auto-generates score string)
+
+### cricket-data.ts changes:
+- Added 20 new optional live score fields to the `Fixture` interface: battingTeam, team1Score, team1Wickets, team1Overs, team2Score, team2Wickets, team2Overs, striker, nonStriker, bowler, strikerRuns, strikerBalls, nonStrikerRuns, nonStrikerBalls, bowlerRuns, bowlerWickets, bowlerOvers, thisOver
+- Added same fields to `ApiFixture` interface
+- Updated `fetchFixtures()` to map all new fields from API response
+
+### hero-section.tsx changes:
+- Completely rewrote the live match card to show detailed structured score data:
+  - Team scores prominently displayed: `RUNS/WICKETS` in large bold text with `(overs ov)` below
+  - Run rate computed and shown: `CRR: 12.45`
+  - BATTING indicator: glowing green ring + badge on currently batting team
+  - Current batsmen section: `⚡ StrikerName 45(23) | NonStrikerName 12(15)`
+  - Current bowler section: `BowlerName 2/24 (3.2 ov)`
+  - This over ball display: last balls shown as colored badges (0=gray, 4=green border, 6=green bg, W=red, Wd/Nb=yellow)
+- Added auto-refresh: 10-second interval `setInterval` that re-fetches fixtures when a live match exists
+- Added `computeRunRate()` helper function
+- Added `getBallBadgeClass()` helper for ball color coding
+- Added `useRef` for interval cleanup
+- Kept all existing UI (stats, recent results, table toppers, animations, background blobs)
+
+### admin/fixtures/page.tsx changes (complete rewrite of score dialog):
+- Added `ApiPlayer` interface for player dropdowns
+- Extended `FixtureItem` interface with all 20 live score fields
+- Added `LiveScoreState` interface and `createDefaultLiveScore()` factory function
+- Added helper functions: `parseOvers()`, `formatOvers()`, `addBallToOvers()`, `computeRunRate()`, `getBallBadgeClass()`
+- Added player state: fetches from `/api/players` on mount
+- Computed `battingTeamPlayers` and `bowlingTeamPlayers` filtered by current batting/bowling team
+
+**New Live Score Control Dialog (sm:max-w-2xl) with 6 sections:**
+
+A. **Scoreboard Header** — Grid of 2 team cards:
+   - Team avatar (colored circle with short name), team full name
+   - Current score: `RUNS/WICKETS` large bold
+   - Overs display: `(5.3 ov)`
+   - CRR calculation for batting team
+   - Green glowing ring + "BATTING" badge on currently batting team
+   - Non-batting team shown with reduced opacity
+
+B. **Match Controls** — 4 action buttons in a row:
+   - Set LIVE (green) — changes fixture status to LIVE via API
+   - Switch Innings — toggles battingTeam 1↔2, resets bowler/striker
+   - End Match (green outline) — sets status to COMPLETED
+   - Reset (red outline) — resets all score state to defaults
+
+C. **Current Batsmen Section** — Two side-by-side cards:
+   - Striker card: yellow border, ⚡ icon, player name Select dropdown (filtered by batting team), runs & balls display
+   - Non-Striker card: neutral border, player name Select dropdown, runs & balls display
+   - Swap Strike button between them
+
+D. **Current Bowler Section**:
+   - Bowler name Select dropdown (filtered by bowling team)
+   - Stats grid: Wickets/Runs, Overs, Economy rate (computed)
+   - This over ball display: colored badges for each ball
+
+E. **Quick Action Buttons Grid** (4 columns):
+   - Row 1: 0 (dot), 1, 2, 3 — outline muted buttons
+   - Row 2: FOUR! (green), SIX! (dark green), WICKET! (red), WIDE (yellow)
+   - Row 3: NO BALL (yellow), UNDO Last Ball (gray, spans 3 cols)
+   - Each button click: updates team score, striker stats, bowler figures, thisOver string
+   - Auto-advances over after 6 legal deliveries, swaps strike at over end
+   - Odd runs trigger automatic strike swap
+   - Debounced auto-save: 2 seconds after last click via `apiPut`
+
+F. **Manual Override** section:
+   - 6 text inputs: Team 1/2 Score, Wickets, Overs
+   - Result text input for end of match
+   - "Apply Manual Override" button to sync manual inputs to live state
+
+**Key implementation details:**
+- Dialog opens by fetching players from `/api/players` to populate dropdowns
+- On opening: parses existing fixture data to initialize all live score state
+- `saveLiveScore()` function: sends all structured fields via `apiPut("/api/fixtures", payload)`
+- Debounced save with `useRef` timeout cleanup on dialog close
+- Force-save on dialog close (clears debounce, saves immediately)
+- Undo: removes last ball from thisOver and reverses all stat changes
+- Auto-save indicator shows "Auto-saving..." with spinner during saves
+- Changed "Update Score" menu label to "Live Score" in both desktop and mobile views
+
+- ESLint passes with zero errors
+
+Stage Summary:
+- Hero section now shows rich live score data with auto-refresh every 10 seconds
+- Admin fixtures page has a comprehensive Live Score Control Dialog with:
+  - Visual scoreboard with batting team highlight
+  - Match control buttons (Live/Switch Innings/End Match/Reset)
+  - Batsman selection from team players with individual stats
+  - Bowler selection from opposing team with figures and economy
+  - Quick scoring buttons (0-6, Wicket, Wide, No Ball, Undo)
+  - This over ball display with color coding
+  - Manual override inputs for direct score editing
+  - Debounced auto-save (2 seconds after last interaction)
+  - Force-save on dialog close
+- All TypeScript types updated in cricket-data.ts
+- cricket-green theme used throughout (green-500, green-600, lime-500, yellow-500)
+- No indigo/blue colors used
+- Responsive design maintained
