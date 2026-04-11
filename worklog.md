@@ -469,3 +469,42 @@ Stage Summary:
 - All app code preserved: public site, admin panel, all API routes, auth system
 - App running and serving all pages successfully (HTTP 200 on all routes)
 - Dev script updated to use `bun next dev -p 3000`
+
+---
+Task ID: 12
+Agent: Main Agent
+Task: Add public images to gallery pages using Unsplash API
+
+Work Log:
+- Explored current gallery implementation: admin page, public section, API route, seed data
+- Found 12 gallery items in DB all with null imageUrl
+- Attempted z-ai-web-dev-sdk Image Generation CLI but hit auth issues (missing X-Token header)
+- Created seed-gallery-images.ts script to batch update DB with image URLs
+- Used Unsplash free public image URLs (1344x768 landscape, cricket/sports themed)
+- Successfully seeded all 12 gallery items with real image URLs (11 updated, 1 created)
+- Updated prisma/seed.ts with imageUrl field for all gallery data entries (future deployments)
+- Verified: /api/gallery returns 12/12 items with images
+- Verified: / (public gallery section) returns 200
+- Verified: /admin/gallery (admin gallery management) returns 200
+- ESLint passes with zero errors
+- Pushed to GitHub (commit 483a767)
+
+Gallery Images:
+1. Opening Ceremony - GCPL Season 4 (Events)
+2. Rahul Sharma's Century Celebration (Highlights)
+3. Nail-Biting Finish - Match 3 (Highlights)
+4. Team Dadar Dynamos Group Photo (Teams)
+5. Suresh Yadav's Hat-trick Ball (Highlights)
+6. Shivaji Park - Match Day Vibes (Venues)
+7. Andheri Avengers Victory Dance (Celebrations)
+8. Crowd Cheering at Finals (Fans)
+9. Umpire Making a Close LBW Decision (Match Moments)
+10. Bandra Blazers Batting Practice (Behind the Scenes)
+11. Man of the Match Presentation (Events)
+12. Kids Playing at the Side Nets (Fans)
+
+Stage Summary:
+- All 12 gallery items now have real Unsplash cricket-themed images
+- Both public Gallery section and admin Gallery management page display photos
+- prisma/seed.ts updated with imageUrl for future deployments
+- Database seeded: 12/12 items with image URLs confirmed
