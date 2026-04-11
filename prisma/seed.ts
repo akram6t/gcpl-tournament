@@ -116,18 +116,18 @@ async function seed() {
 
   // ============ GALLERY ============
   const galleryData = [
-    { title: "Opening Ceremony - GCPL Season 4", category: "Events" },
-    { title: "Rahul Sharma's Century Celebration", category: "Highlights" },
-    { title: "Nail-Biting Finish - Match 3", category: "Highlights" },
-    { title: "Team Dadar Dynamos Group Photo", category: "Teams" },
-    { title: "Suresh Yadav's Hat-trick Ball", category: "Highlights" },
-    { title: "Shivaji Park - Match Day Vibes", category: "Venues" },
-    { title: "Andheri Avengers Victory Dance", category: "Celebrations" },
-    { title: "Crowd Cheering at Finals", category: "Fans" },
-    { title: "Umpire Making a Close LBW Decision", category: "Match Moments" },
-    { title: "Bandra Blazers Batting Practice", category: "Behind the Scenes" },
-    { title: "Man of the Match Presentation", category: "Events" },
-    { title: "Kids Playing at the Side Nets", category: "Fans" },
+    { title: "Opening Ceremony - GCPL Season 4", category: "Events", imageUrl: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1344&h=768&fit=crop&q=80" },
+    { title: "Rahul Sharma's Century Celebration", category: "Highlights", imageUrl: "https://images.unsplash.com/photo-1624526267940-533860e73863?w=1344&h=768&fit=crop&q=80" },
+    { title: "Nail-Biting Finish - Match 3", category: "Highlights", imageUrl: "https://images.unsplash.com/photo-1638419295371-1c1b1f7b3a6f?w=1344&h=768&fit=crop&q=80" },
+    { title: "Team Dadar Dynamos Group Photo", category: "Teams", imageUrl: "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1344&h=768&fit=crop&q=80" },
+    { title: "Suresh Yadav's Hat-trick Ball", category: "Highlights", imageUrl: "https://images.unsplash.com/photo-1600679472829-3044539ce8ed?w=1344&h=768&fit=crop&q=80" },
+    { title: "Shivaji Park - Match Day Vibes", category: "Venues", imageUrl: "https://images.unsplash.com/photo-1536037707785-9bed4feb5e5d?w=1344&h=768&fit=crop&q=80" },
+    { title: "Andheri Avengers Victory Dance", category: "Celebrations", imageUrl: "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=1344&h=768&fit=crop&q=80" },
+    { title: "Crowd Cheering at Finals", category: "Fans", imageUrl: "https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=1344&h=768&fit=crop&q=80" },
+    { title: "Umpire Making a Close LBW Decision", category: "Match Moments", imageUrl: "https://images.unsplash.com/photo-1626954352713-493ef795f566?w=1344&h=768&fit=crop&q=80" },
+    { title: "Bandra Blazers Batting Practice", category: "Behind the Scenes", imageUrl: "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=1344&h=768&fit=crop&q=80" },
+    { title: "Man of the Match Presentation", category: "Events", imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1344&h=768&fit=crop&q=80" },
+    { title: "Kids Playing at the Side Nets", category: "Fans", imageUrl: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?w=1344&h=768&fit=crop&q=80" },
   ];
 
   for (const g of galleryData) {
